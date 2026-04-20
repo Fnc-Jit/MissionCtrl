@@ -61,6 +61,15 @@ class StepRequestBody(BaseModel):
     action: str
 
 
+class ResultRequest(BaseModel):
+    tier: str
+    score: float
+    steps: int
+    history: List[Dict[str, Any]] = []
+    score_breakdown: Dict[str, Any] = {}
+    hallucination_stats: Dict[str, Any] = {}
+
+
 # ---------------------------------------------------------------------------
 # FastAPI app
 # ---------------------------------------------------------------------------
@@ -143,25 +152,7 @@ async def reset(req: Optional[ResetRequest] = None) -> Dict[str, Any]:
     if req.task_id not in valid:
         raise HTTPException(status_code=422, detail=f"task_id must be one of {sorted(valid)}")
 
-    # Capture completed episode before reset (for dashboard accumulation)
-    if _env.engine and _env.engine.done and _env.action_history:
-        try:
-            last_entry = _env.action_history[-1]
-            info = last_entry.get("info", {})
-            sb = info.get("score_breakdown", {})
-            if sb:
-                _completed_results.append({
-                    "tier": _env.engine.difficulty,
-                    "score": sb.get("final_score", 0),
-                    "steps": len(_env.action_history),
-                    "history": list(_env.action_history),
-                    "score_breakdown": sb,
-                    "hallucination_stats": sb.get("hallucination_stats", {}),
-                    "state": _env.engine.get_state(),
-                })
-        except Exception:
-            pass  # Don't block reset on capture errors
-
+    # Results are now pushed explicitly via POST /result from inference.py
     result = _env.reset(task_id=req.task_id, seed=req.seed)
     log.info("Reset → task=%s seed=%s", req.task_id, req.seed)
     return result
@@ -207,6 +198,21 @@ async def history() -> List[Dict[str, Any]]:
 async def results() -> List[Dict[str, Any]]:
     """Return all completed episode results (persists across resets)."""
     return _completed_results
+
+
+@app.post("/result")
+async def post_result(req: ResultRequest) -> Dict[str, str]:
+    """Accept a completed task result pushed by the inference script."""
+    _completed_results.append({
+        "tier": req.tier,
+        "score": req.score,
+        "steps": req.steps,
+        "history": req.history,
+        "score_breakdown": req.score_breakdown,
+        "hallucination_stats": req.hallucination_stats,
+    })
+    log.info("Result pushed → tier=%s score=%.4f steps=%d", req.tier, req.score, req.steps)
+    return {"status": "ok"}
 
 
 # ---------------------------------------------------------------------------

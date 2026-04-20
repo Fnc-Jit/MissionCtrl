@@ -66,6 +66,8 @@ tr:hover td{background:rgba(99,102,241,.04)}
 .timeline-action{flex:1;font-family:'Inter',monospace;color:var(--text)}
 .timeline-reward{font-weight:700;min-width:60px;text-align:right}
 .timeline-reward.positive{color:var(--green)}.timeline-reward.negative{color:var(--red)}
+.timeline-indicator{width:8px;height:8px;border-radius:50%}
+.timeline-indicator.tp{background:var(--tp-green)}.timeline-indicator.fp{background:var(--fp-red)}
 
 /* Score Panel */
 .score-final{text-align:center;padding:16px 0}
@@ -101,80 +103,44 @@ select{padding:8px 12px;border-radius:8px;border:1px solid var(--card-border);ba
 .incident-miss{background:rgba(239,68,68,.08);border-color:var(--red);color:#fca5a5}
 .incident-fp{background:rgba(245,158,11,.08);border-color:var(--amber);color:#fcd34d}
 
-/* ── Run Results ─────────────────────────────── */
-.results-panel{margin-top:8px}
-.results-title{font-size:.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);
-  margin-bottom:16px;display:flex;align-items:center;gap:8px}
-.results-title span{font-size:1rem}
-
-.run-summary{display:flex;align-items:center;gap:16px;padding:14px 20px;margin-bottom:12px;
-  background:linear-gradient(135deg,rgba(99,102,241,.1),rgba(139,92,246,.06));
-  border:1px solid var(--card-border);border-radius:12px}
-.run-avg{font-size:1.3rem;font-weight:800;letter-spacing:-0.02em}
-.run-details{font-size:.78rem;color:var(--text-dim);flex:1}
-
-/* Tier Card */
-.tier-card{background:var(--card);border:1px solid var(--card-border);border-radius:14px;margin-bottom:12px;
-  overflow:hidden;animation:fadeIn .4s ease}
-.tier-header{display:flex;align-items:center;gap:16px;padding:16px 20px;cursor:pointer;transition:background .2s}
-.tier-header:hover{background:rgba(99,102,241,.04)}
-.tier-ring{position:relative;width:56px;height:56px;flex-shrink:0}
-.tier-ring svg{transform:rotate(-90deg)}
-.tier-ring circle{fill:none;stroke-width:6;stroke-linecap:round}
-.tier-ring .track{stroke:rgba(31,41,55,.8)}
-.tier-ring .fill{transition:stroke-dashoffset .8s ease}
-.tier-ring-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  font-size:.9rem;font-weight:800;letter-spacing:-0.02em}
-.tier-info{flex:1}
-.tier-name{font-size:.95rem;font-weight:700;margin-bottom:2px}
-.tier-meta{font-size:.75rem;color:var(--text-dim);display:flex;gap:16px;flex-wrap:wrap}
-.tier-perf{padding:3px 10px;border-radius:6px;font-size:.65rem;font-weight:700;letter-spacing:.04em;
-  text-transform:uppercase;flex-shrink:0}
-.perf-excellent{background:rgba(16,185,129,.15);color:#34d399}
-.perf-good{background:rgba(59,130,246,.15);color:#60a5fa}
-.perf-fair{background:rgba(245,158,11,.15);color:#fbbf24}
-.perf-poor{background:rgba(239,68,68,.15);color:#f87171}
-.tier-chevron{color:var(--text-dim);font-size:1.2rem;transition:transform .3s;flex-shrink:0}
-.tier-chevron.open{transform:rotate(180deg)}
-.tier-details{display:none;padding:0 20px 20px;border-top:1px solid var(--card-border)}
-.tier-details.open{display:block}
-.tier-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
-
-/* Report Section */
-.report-section{background:rgba(17,24,39,.6);border:1px solid var(--card-border);border-radius:10px;padding:14px}
-.report-section-title{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
-  color:var(--accent);margin-bottom:10px;display:flex;align-items:center;gap:6px}
-
-/* Detection Matrix */
-.detect-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
-.detect-cell{text-align:center;padding:8px 4px;border-radius:8px;background:rgba(31,41,55,.5)}
-.detect-cell .num{font-size:1.2rem;font-weight:800;line-height:1}
-.detect-cell .lbl{font-size:.55rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);margin-top:3px}
-.detect-cell.tp .num{color:var(--green)}
-.detect-cell.miss .num{color:var(--red)}
-.detect-cell.fp .num{color:var(--amber)}
-
-/* Action Log */
-.action-log{max-height:180px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--card-border) transparent}
-.action-row{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;font-size:.75rem;
-  border-bottom:1px solid rgba(31,41,55,.3)}
-.action-row:hover{background:rgba(99,102,241,.04)}
-.action-num{min-width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;
-  font-weight:700;font-size:.65rem;background:rgba(99,102,241,.1);color:#818cf8}
-.action-text{flex:1;font-family:'Inter',monospace;color:var(--text)}
-.action-reward{font-weight:700;font-size:.75rem;min-width:44px;text-align:right}
-.action-reward.pos{color:var(--green)}.action-reward.neg{color:var(--red)}
-.action-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
-.action-dot.tp{background:var(--tp-green)}.action-dot.fp{background:var(--fp-red)}.action-dot.neutral{background:var(--text-dim)}
-
-/* Findings */
-.finding{display:flex;gap:8px;padding:8px 10px;margin-bottom:5px;border-radius:7px;font-size:.78rem;line-height:1.45;
-  align-items:flex-start}
-.finding-icon{font-size:.9rem;flex-shrink:0;margin-top:1px}
-.finding-good{background:rgba(16,185,129,.06);border-left:3px solid var(--green)}
-.finding-warn{background:rgba(245,158,11,.06);border-left:3px solid var(--amber)}
-.finding-bad{background:rgba(239,68,68,.06);border-left:3px solid var(--red)}
-.finding-info{background:rgba(59,130,246,.06);border-left:3px solid var(--blue)}
+/* Run Results */
+.run-results{display:flex;flex-direction:column;gap:10px}
+.result-chip{background:rgba(99,102,241,.06);border:1px solid var(--card-border);
+  border-radius:10px;overflow:hidden;transition:border-color .2s}
+.result-chip:hover{border-color:var(--accent)}
+.result-header{display:flex;align-items:center;gap:14px;padding:14px 16px;cursor:pointer;user-select:none}
+.result-header .result-num{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+  font-size:.75rem;font-weight:700;background:rgba(99,102,241,.15);color:#818cf8;flex-shrink:0}
+.result-header .tier{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);min-width:60px}
+.result-header .chip-score{font-size:1.3rem;font-weight:800;letter-spacing:-0.02em;flex-shrink:0}
+.result-header .chip-meta{font-size:.72rem;color:var(--text-dim);flex:1}
+.result-header .chip-bar{width:100px;height:5px;background:rgba(31,41,55,.8);border-radius:3px;overflow:hidden;flex-shrink:0}
+.result-header .chip-bar-fill{height:100%;border-radius:3px;transition:width .5s ease}
+.result-header .expand-icon{font-size:.8rem;color:var(--text-dim);transition:transform .25s;flex-shrink:0}
+.result-chip.open .expand-icon{transform:rotate(180deg)}
+/* Dropdown */
+.result-details{max-height:0;overflow:hidden;transition:max-height .35s ease}
+.result-chip.open .result-details{max-height:600px}
+.result-details-inner{padding:0 16px 16px;border-top:1px solid var(--card-border)}
+.detail-section{margin-top:10px}
+.detail-section-title{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);margin-bottom:6px}
+.detail-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:.78rem}
+.detail-row .dl{color:var(--text-dim)}
+.detail-row .dv{font-weight:600}
+.detail-bar{display:flex;align-items:center;gap:6px;margin:3px 0}
+.detail-bar-label{font-size:.72rem;color:var(--text-dim);min-width:120px;text-transform:capitalize}
+.detail-bar-track{flex:1;height:6px;background:rgba(31,41,55,.8);border-radius:3px;overflow:hidden}
+.detail-bar-fill{height:100%;border-radius:3px}
+.detail-bar-val{font-size:.72rem;font-weight:600;min-width:44px;text-align:right}
+.detail-actions{max-height:120px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--card-border) transparent}
+.detail-action-row{display:flex;gap:8px;align-items:center;padding:3px 0;font-size:.75rem;border-bottom:1px solid rgba(31,41,55,.2)}
+.detail-action-step{width:22px;text-align:center;color:var(--text-dim);font-weight:600}
+.detail-action-text{flex:1;font-family:'Inter',monospace;color:var(--text)}
+.detail-action-rwd{font-weight:700;min-width:40px;text-align:right}
+.detail-action-rwd.pos{color:var(--green)}.detail-action-rwd.neg{color:var(--red)}
+.run-avg{text-align:center;padding:10px 0;margin-top:8px;font-size:.85rem;color:var(--text-dim);
+  border-top:1px solid var(--card-border)}
+.run-avg strong{font-size:1.2rem;font-weight:700;color:var(--text-bright)}
 </style>
 </head>
 <body>
@@ -256,13 +222,13 @@ select{padding:8px 12px;border-radius:8px;border:1px solid var(--card-border);ba
       <div class="card-title"><span>🚨</span> Incidents</div>
       <div id="incident-list"></div>
     </div>
-  </div>
 
-  <!-- Accumulated Run Results (persists across tiers) -->
-  <div class="results-panel" id="results-panel" style="display:none">
-    <div class="results-title"><span>📝</span> Run Results</div>
-    <div id="run-summary"></div>
-    <div id="tier-results"></div>
+    <!-- Run Results -->
+    <div class="card full-width" id="run-results-card">
+      <div class="card-title"><span>🏆</span> Run Results</div>
+      <div class="run-results" id="run-results"><div class="empty">No completed tasks yet</div></div>
+      <div class="run-avg" id="run-avg" style="display:none"></div>
+    </div>
   </div>
 </div>
 
@@ -273,7 +239,6 @@ let lastHistoryLen = 0;
 let prevStep = 0;
 let prevTask = '';
 let prevDone = false;
-let completedTiers = {};
 
 // ── Polling ──────────────────────────────────────────────────────────────
 
@@ -287,24 +252,9 @@ function startPolling() {
       if (!stateRes.ok || !histRes.ok) return;
       const state = await stateRes.json();
       const history = await histRes.json();
+      const runResults = resultsRes.ok ? await resultsRes.json() : [];
       updateDashboard(state, history);
-
-      // Hydrate any missed completed tiers from server-side accumulated results
-      if (resultsRes && resultsRes.ok) {
-        const serverResults = await resultsRes.json();
-        for (const r of serverResults) {
-          const tier = (r.tier || '').toLowerCase();
-          if (tier && !completedTiers[tier]) {
-            appendTierResult(
-              r.state || {difficulty: tier, tasks: []},
-              r.history || [],
-              r.score_breakdown || {},
-              r.hallucination_stats || {}
-            );
-          }
-        }
-      }
-
+      updateRunResults(runResults);
       document.getElementById('badge-health').textContent = '● LIVE';
       document.getElementById('badge-health').classList.remove('offline');
     } catch {
@@ -316,8 +266,7 @@ function startPolling() {
 
 function stopPolling() { if (pollInterval) { clearInterval(pollInterval); pollInterval = null; } }
 
-// Reset only the live episode panels — NOT the accumulated results
-function resetLivePanels() {
+function resetEpisodePanels() {
   lastHistoryLen = 0;
   document.getElementById('score-card').style.display = 'none';
   document.getElementById('incident-card').style.display = 'none';
@@ -327,21 +276,13 @@ function resetLivePanels() {
   document.getElementById('kpi-fp').className = 'kpi-value';
 }
 
-// Full reset — clears everything including accumulated results (manual reset only)
-function resetAll() {
-  resetLivePanels();
-  completedTiers = {};
-  document.getElementById('results-panel').style.display = 'none';
-  document.getElementById('tier-results').innerHTML = '';
-  document.getElementById('run-summary').innerHTML = '';
-}
-
 // ── Dashboard Update ─────────────────────────────────────────────────────
 
 function updateDashboard(state, history) {
   const currentTask = (state.difficulty || '');
   const currentStep = Number(state.time_step || 0);
 
+  // Auto-detect new episode even when another process runs /reset.
   const newEpisodeDetected =
     currentStep < prevStep ||
     (history.length < lastHistoryLen) ||
@@ -349,12 +290,12 @@ function updateDashboard(state, history) {
     (prevTask && currentTask && prevTask !== currentTask && currentStep <= 1);
 
   if (newEpisodeDetected) {
-    resetLivePanels();  // Only reset live panels, keep results
+    resetEpisodePanels();
   }
 
   // Header badges
   document.getElementById('badge-task').textContent = `TASK: ${(currentTask || '—').toUpperCase()}`;
-  document.getElementById('badge-step').textContent = `STEP: ${state.time_step || 0} / ${state.max_steps || 5}`;
+  document.getElementById('badge-step').textContent = `STEP: ${state.time_step || 0} / ${state.max_steps || 15}`;
   const doneEl = document.getElementById('badge-done');
   if (state.done) { doneEl.style.display = ''; } else { doneEl.style.display = 'none'; }
 
@@ -367,20 +308,6 @@ function updateDashboard(state, history) {
   const tasks = state.tasks || [];
   const doneCount = tasks.filter(t => t.status === 'DONE').length;
   document.getElementById('kpi-tasks').textContent = `${doneCount} / ${tasks.length}`;
-
-  // Live detection KPIs
-  const liveStats = state.hallucination_stats || {};
-  if (liveStats.total_flags > 0 || liveStats.total_injected > 0) {
-    const dr = liveStats.total_injected > 0 ? ((liveStats.total_caught / liveStats.total_injected) * 100) : 100;
-    const drEl = document.getElementById('kpi-detection');
-    drEl.textContent = dr.toFixed(0) + '%';
-    drEl.className = 'kpi-value ' + (dr >= 85 ? 'good' : dr >= 50 ? 'warn' : 'bad');
-
-    const fpRate = liveStats.total_flags > 0 ? ((liveStats.false_positives / liveStats.total_flags) * 100) : 0;
-    const fpEl = document.getElementById('kpi-fp');
-    fpEl.textContent = fpRate.toFixed(0) + '%';
-    fpEl.className = 'kpi-value ' + (fpRate <= 10 ? 'good' : fpRate <= 25 ? 'warn' : 'bad');
-  }
 
   // Task table
   const tbody = document.getElementById('task-table');
@@ -441,15 +368,19 @@ function updateDashboard(state, history) {
     }
     document.getElementById('score-bars').innerHTML = barsHtml;
 
+    // Detection KPIs
     const stats = sb.hallucination_stats || {};
     const dr = stats.total_injected > 0 ? ((stats.total_caught / stats.total_injected) * 100) : 100;
-    document.getElementById('kpi-detection').textContent = dr.toFixed(0) + '%';
-    document.getElementById('kpi-detection').className = 'kpi-value ' + (dr >= 85 ? 'good' : dr >= 50 ? 'warn' : 'bad');
+    const drEl = document.getElementById('kpi-detection');
+    drEl.textContent = dr.toFixed(0) + '%';
+    drEl.className = 'kpi-value ' + (dr >= 85 ? 'good' : dr >= 50 ? 'warn' : 'bad');
 
     const fpRate = stats.total_flags > 0 ? ((stats.false_positives / stats.total_flags) * 100) : 0;
-    document.getElementById('kpi-fp').textContent = fpRate.toFixed(0) + '%';
-    document.getElementById('kpi-fp').className = 'kpi-value ' + (fpRate <= 10 ? 'good' : fpRate <= 25 ? 'warn' : 'bad');
+    const fpEl = document.getElementById('kpi-fp');
+    fpEl.textContent = fpRate.toFixed(0) + '%';
+    fpEl.className = 'kpi-value ' + (fpRate <= 10 ? 'good' : fpRate <= 25 ? 'warn' : 'bad');
 
+    // Incidents
     if (stats.total_injected > stats.total_caught || stats.false_positives > 0) {
       document.getElementById('incident-card').style.display = '';
       let html = '';
@@ -459,168 +390,12 @@ function updateDashboard(state, history) {
       document.getElementById('incident-list').innerHTML = html;
     }
 
-    // Accumulate this tier's result (persists across episodes)
-    appendTierResult(state, history, sb, stats);
+    // Keep polling alive so dashboard follows progress across next task/episode.
   }
 
   prevStep = currentStep;
   prevTask = currentTask;
   prevDone = !!state.done;
-}
-
-// ── Accumulated Tier Results ─────────────────────────────────────────────
-
-function appendTierResult(state, history, sb, stats) {
-  const tier = (state.difficulty || 'easy').toLowerCase();
-  if (completedTiers[tier]) return;  // already recorded
-
-  const score = sb.final_score || 0;
-  const steps = history.length;
-  const cumReward = history.reduce((s, h) => s + (h.reward || 0), 0);
-  completedTiers[tier] = { score, steps, cumReward };
-
-  document.getElementById('results-panel').style.display = '';
-
-  // Performance label
-  let perfClass, perfLabel;
-  if (score >= 0.8) { perfClass = 'perf-excellent'; perfLabel = 'Excellent'; }
-  else if (score >= 0.55) { perfClass = 'perf-good'; perfLabel = 'Good'; }
-  else if (score >= 0.3) { perfClass = 'perf-fair'; perfLabel = 'Fair'; }
-  else { perfClass = 'perf-poor'; perfLabel = 'Poor'; }
-
-  const r = 22, c = 2 * Math.PI * r;
-  const offset = c - (score * c);
-  const ringColor = score >= 0.8 ? '#10b981' : score >= 0.55 ? '#3b82f6' : score >= 0.3 ? '#f59e0b' : '#ef4444';
-  const missed = stats.total_injected - stats.total_caught;
-
-  const el = document.createElement('div');
-  el.className = 'tier-card';
-  el.innerHTML = `
-    <div class="tier-header" onclick="toggleDetails('${tier}')">
-      <div class="tier-ring">
-        <svg width="56" height="56" viewBox="0 0 56 56">
-          <circle class="track" cx="28" cy="28" r="${r}"/>
-          <circle class="fill" cx="28" cy="28" r="${r}"
-            stroke="${ringColor}" stroke-dasharray="${c.toFixed(1)}"
-            stroke-dashoffset="${offset.toFixed(1)}"/>
-        </svg>
-        <div class="tier-ring-label" style="color:${ringColor}">${(score * 100).toFixed(0)}%</div>
-      </div>
-      <div class="tier-info">
-        <div class="tier-name">${tier.toUpperCase()}</div>
-        <div class="tier-meta">
-          <span>⏱ ${steps} steps</span>
-          <span>🎯 TP:${stats.true_positives || 0}</span>
-          <span>❌ Missed:${missed}</span>
-          <span>🚩 FP:${stats.false_positives || 0}</span>
-          <span>${cumReward >= 0 ? '+' : ''}${cumReward.toFixed(1)} reward</span>
-        </div>
-      </div>
-      <span class="tier-perf ${perfClass}">${perfLabel}</span>
-      <span class="tier-chevron" id="chev-${tier}">▼</span>
-    </div>
-    <div class="tier-details" id="det-${tier}">
-      <div class="tier-grid">
-        <div class="report-section">
-          <div class="report-section-title">🎯 Detection Matrix</div>
-          <div class="detect-grid">
-            <div class="detect-cell tp"><div class="num">${stats.true_positives || 0}</div><div class="lbl">True Pos</div></div>
-            <div class="detect-cell miss"><div class="num">${missed}</div><div class="lbl">Missed</div></div>
-            <div class="detect-cell fp"><div class="num">${stats.false_positives || 0}</div><div class="lbl">False Pos</div></div>
-          </div>
-        </div>
-        <div class="report-section">
-          <div class="report-section-title">📋 Action Log</div>
-          <div class="action-log">${buildActionLog(history)}</div>
-        </div>
-      </div>
-      <div class="report-section" style="margin-top:14px">
-        <div class="report-section-title">🔍 Findings & Problems</div>
-        ${buildFindings(sb, stats, history, state)}
-      </div>
-    </div>`;
-
-  document.getElementById('tier-results').appendChild(el);
-  updateRunSummary();
-}
-
-function toggleDetails(tier) {
-  const d = document.getElementById(`det-${tier}`);
-  const c = document.getElementById(`chev-${tier}`);
-  d.classList.toggle('open');
-  c.classList.toggle('open');
-}
-
-function buildActionLog(history) {
-  return history.map(h => {
-    const rc = (h.reward || 0) >= 0 ? 'pos' : 'neg';
-    const rs = (h.reward || 0) >= 0 ? '+' : '';
-    const at = (h.info || {}).action_type || '';
-    let dot = 'neutral';
-    if (at === 'FLAG') dot = (h.reward || 0) > 0 ? 'tp' : 'fp';
-    return `<div class="action-row">
-      <div class="action-num">${h.step}</div>
-      <div class="action-dot ${dot}"></div>
-      <div class="action-text">${h.action || 'NOOP'}</div>
-      <div class="action-reward ${rc}">${rs}${(h.reward || 0).toFixed(1)}</div>
-    </div>`;
-  }).join('');
-}
-
-function buildFindings(sb, stats, history, state) {
-  const f = [];
-  const sig = sb.signals || {};
-  const s1 = sig.task_completion, s2 = sig.hallucination_detection;
-  const s3 = sig.false_positive_penalty, s5 = sig.llm_judge_quality;
-
-  if (s2 && s2.value >= 1.0) f.push({t:'good',i:'✅',m:`All ${stats.total_injected} hallucination(s) detected — perfect.`});
-  else if (s2 && s2.value > 0) f.push({t:'warn',i:'⚠️',m:`${stats.total_caught}/${stats.total_injected} hallucination(s) detected (${(s2.value*100).toFixed(0)}%).`});
-  else if (stats.total_injected > 0) f.push({t:'bad',i:'❌',m:`Zero hallucinations detected out of ${stats.total_injected}.`});
-
-  if (stats.false_positives > 0) f.push({t:'warn',i:'🚩',m:`${stats.false_positives} false positive(s) — costs −${Math.abs(s3?s3.contribution:0).toFixed(3)}.`});
-  else if (stats.total_flags > 0) f.push({t:'good',i:'🎯',m:'Zero false positives — all flags accurate.'});
-
-  if (s1 && s1.value >= 1.0) f.push({t:'good',i:'✅',m:'All tasks completed correctly.'});
-  else if (s1) { const n=Math.round(s1.value*(state.tasks||[]).length); f.push({t:'info',i:'📋',m:`${n}/${(state.tasks||[]).length} tasks completed correctly.`}); }
-
-  const noops = history.filter(h=>(h.action||'').trim()==='NOOP').length;
-  if (noops > 0) f.push({t:'warn',i:'💤',m:`${noops} NOOP(s) — wasted steps (−0.1 each).`});
-
-  const bad = history.filter(h=>(h.info||{}).action_type==='APPROVE'&&(h.reward||0)<=-1.5);
-  if (bad.length > 0) f.push({t:'bad',i:'💀',m:`${bad.length} hallucinated task(s) APPROVED without flagging (−2.0 each).`});
-
-  const bs = history.filter(h=>(h.action||'').startsWith('SYNTHESIZE')&&(h.reward||0)<0);
-  if (bs.length > 0) f.push({t:'bad',i:'⛔',m:'Premature SYNTHESIZE_REPORT with uncaught hallucinations (−3.0).'});
-
-  if (s5 && s5.value < 0.5) f.push({t:'info',i:'📝',m:'FLAG evidence quality low — use domain keywords.'});
-  if (f.length === 0) f.push({t:'good',i:'🏆',m:'No issues — strong oversight performance.'});
-
-  return f.map(x=>`<div class="finding finding-${x.t}"><span class="finding-icon">${x.i}</span><div>${x.m}</div></div>`).join('');
-}
-
-function updateRunSummary() {
-  const tiers = Object.keys(completedTiers);
-  if (tiers.length === 0) return;
-
-  const scores = tiers.map(t => completedTiers[t].score);
-  const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-  const totalSteps = tiers.reduce((s, t) => s + completedTiers[t].steps, 0);
-  const avgColor = avg >= 0.8 ? '#10b981' : avg >= 0.55 ? '#3b82f6' : avg >= 0.3 ? '#f59e0b' : '#ef4444';
-
-  const chips = tiers.map(t => {
-    const s = completedTiers[t].score;
-    const c = s >= 0.8 ? '#10b981' : s >= 0.55 ? '#3b82f6' : s >= 0.3 ? '#f59e0b' : '#ef4444';
-    return `<span style="color:${c};font-weight:700">${t.toUpperCase()}: ${(s*100).toFixed(0)}%</span>`;
-  }).join(' · ');
-
-  document.getElementById('run-summary').innerHTML = `
-    <div class="run-summary">
-      <div class="run-avg" style="color:${avgColor}">${(avg*100).toFixed(0)}%</div>
-      <div class="run-details">
-        <div style="margin-bottom:2px">Average across <strong>${tiers.length}</strong> tier(s) · ${totalSteps} total steps</div>
-        <div>${chips}</div>
-      </div>
-    </div>`;
 }
 
 // ── Reset ────────────────────────────────────────────────────────────────
@@ -632,7 +407,7 @@ document.getElementById('btn-reset').addEventListener('click', async () => {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({task_id: taskId})
     });
-    resetAll();  // Manual reset clears everything
+    resetEpisodePanels();
     prevStep = 0;
     prevTask = taskId;
     prevDone = false;
@@ -642,6 +417,117 @@ document.getElementById('btn-reset').addEventListener('click', async () => {
 
 // Start polling on load
 startPolling();
+
+// ── Run Results ──────────────────────────────────────────────────────────
+let lastResultsLen = 0;
+
+function toggleResult(idx) {
+  const chip = document.getElementById('result-chip-' + idx);
+  if (chip) chip.classList.toggle('open');
+}
+
+function buildScoreBars(sb) {
+  const signals = sb.signals || {};
+  const colors = {
+    task_completion: '#10b981', hallucination_detection: '#3b82f6',
+    false_positive_penalty: '#ef4444', delegation_efficiency: '#8b5cf6',
+    llm_judge_quality: '#f59e0b'
+  };
+  let html = '';
+  for (const [key, sig] of Object.entries(signals)) {
+    const pct = Math.min(Math.abs(sig.value || 0) * 100, 100);
+    const label = key.replace(/_/g, ' ');
+    const color = colors[key] || '#6366f1';
+    const contrib = sig.contribution || 0;
+    html += `<div class="detail-bar">
+      <div class="detail-bar-label">${label}</div>
+      <div class="detail-bar-track"><div class="detail-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+      <div class="detail-bar-val" style="color:${color}">${contrib >= 0 ? '+' : ''}${contrib.toFixed(3)}</div>
+    </div>`;
+  }
+  return html || '<div style="color:var(--text-dim);font-size:.75rem">No breakdown available</div>';
+}
+
+function buildActionHistory(history) {
+  if (!history || history.length === 0) return '<div style="color:var(--text-dim);font-size:.75rem">No actions recorded</div>';
+  return '<div class="detail-actions">' + history.map(h => {
+    const rwd = h.reward || 0;
+    const cls = rwd >= 0 ? 'pos' : 'neg';
+    const sign = rwd >= 0 ? '+' : '';
+    return `<div class="detail-action-row">
+      <div class="detail-action-step">${h.step}</div>
+      <div class="detail-action-text">${h.action || '—'}</div>
+      <div class="detail-action-rwd ${cls}">${sign}${rwd.toFixed(1)}</div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+function updateRunResults(results) {
+  if (!results || results.length === lastResultsLen) return;
+  lastResultsLen = results.length;
+
+  const container = document.getElementById('run-results');
+  const avgEl = document.getElementById('run-avg');
+
+  if (results.length === 0) {
+    container.innerHTML = '<div class="empty">No completed tasks yet</div>';
+    avgEl.style.display = 'none';
+    return;
+  }
+
+  const tierColors = { easy: '#10b981', medium: '#3b82f6', hard: '#f59e0b', special: '#8b5cf6' };
+
+  container.innerHTML = results.map((r, i) => {
+    const pct = Math.round((r.score || 0) * 100);
+    const color = tierColors[r.tier] || '#6366f1';
+    const hs = r.hallucination_stats || {};
+    const tp = hs.true_positives ?? '—';
+    const fp = hs.false_positives ?? '—';
+    const caught = hs.total_caught ?? '—';
+    const injected = hs.total_injected ?? '—';
+    const totalFlags = hs.total_flags ?? '—';
+    const scoreClass = r.score >= 0.7 ? 'good' : r.score >= 0.4 ? 'warn' : 'bad';
+    const sb = r.score_breakdown || {};
+    const rawScore = sb.raw_score != null ? sb.raw_score.toFixed(4) : '—';
+
+    return `<div class="result-chip animate-in" id="result-chip-${i}">
+      <div class="result-header" onclick="toggleResult(${i})">
+        <div class="result-num">#${i + 1}</div>
+        <div class="tier">${r.tier}</div>
+        <div class="chip-score ${scoreClass}">${(r.score || 0).toFixed(4)}</div>
+        <div class="chip-meta">${r.steps} steps • TP:${tp} FP:${fp}</div>
+        <div class="chip-bar"><div class="chip-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+        <div class="expand-icon">▾</div>
+      </div>
+      <div class="result-details">
+        <div class="result-details-inner">
+          <div class="detail-section">
+            <div class="detail-section-title">📊 Score Breakdown</div>
+            <div class="detail-row"><span class="dl">Raw Score</span><span class="dv">${rawScore}</span></div>
+            <div class="detail-row"><span class="dl">Final Score</span><span class="dv">${(r.score || 0).toFixed(4)}</span></div>
+            ${buildScoreBars(sb)}
+          </div>
+          <div class="detail-section">
+            <div class="detail-section-title">🔍 Hallucination Stats</div>
+            <div class="detail-row"><span class="dl">Injected</span><span class="dv">${injected}</span></div>
+            <div class="detail-row"><span class="dl">Caught</span><span class="dv" style="color:var(--green)">${caught}</span></div>
+            <div class="detail-row"><span class="dl">Total Flags</span><span class="dv">${totalFlags}</span></div>
+            <div class="detail-row"><span class="dl">True Positives</span><span class="dv" style="color:var(--tp-green)">${tp}</span></div>
+            <div class="detail-row"><span class="dl">False Positives</span><span class="dv" style="color:var(--fp-red)">${fp}</span></div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-section-title">⏱️ Action History</div>
+            ${buildActionHistory(r.history)}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const avg = results.reduce((s, r) => s + (r.score || 0), 0) / results.length;
+  avgEl.style.display = '';
+  avgEl.innerHTML = `Average: <strong>${avg.toFixed(4)}</strong> across ${results.length} tier(s)`;
+}
 </script>
 </body>
 </html>
