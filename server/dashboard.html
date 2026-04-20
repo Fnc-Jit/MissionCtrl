@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MissionCtrl — AI Oversight Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0e1a;--card:#111827;--card-border:#1f2937;
+  --text:#e5e7eb;--text-dim:#9ca3af;--text-bright:#f9fafb;
+  --accent:#6366f1;--accent2:#8b5cf6;
+  --green:#10b981;--amber:#f59e0b;--red:#ef4444;--blue:#3b82f6;
+  --tp-green:#059669;--fp-red:#dc2626;
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.container{max-width:1400px;margin:0 auto;padding:20px}
+
+/* Header */
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding:16px 24px;
+  background:linear-gradient(135deg,rgba(99,102,241,.12),rgba(139,92,246,.08));
+  border:1px solid var(--card-border);border-radius:16px;backdrop-filter:blur(12px)}
+.header h1{font-size:1.5rem;font-weight:800;letter-spacing:-0.02em;
+  background:linear-gradient(135deg,#818cf8,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header .subtitle{font-size:.85rem;color:var(--text-dim);margin-top:2px}
+.header-right{display:flex;gap:12px;align-items:center}
+.badge{padding:6px 14px;border-radius:99px;font-size:.75rem;font-weight:600;letter-spacing:.03em}
+.badge-task{background:rgba(99,102,241,.15);color:#818cf8;border:1px solid rgba(99,102,241,.3)}
+.badge-step{background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.3)}
+.badge-done{background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.3)}
+.badge-health{background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.3)}
+.badge-health.offline{background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.3)}
+
+/* KPI Strip */
+.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.kpi-card{background:var(--card);border:1px solid var(--card-border);border-radius:12px;padding:16px 20px}
+.kpi-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);margin-bottom:6px}
+.kpi-value{font-size:1.8rem;font-weight:700;letter-spacing:-0.02em}
+.kpi-value.good{color:var(--green)}.kpi-value.warn{color:var(--amber)}.kpi-value.bad{color:var(--red)}
+
+/* Grid */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.card{background:var(--card);border:1px solid var(--card-border);border-radius:12px;padding:20px;overflow:hidden}
+.card-title{font-size:.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin-bottom:12px;
+  display:flex;align-items:center;gap:8px}
+.card-title span{font-size:1rem}
+
+/* Task Table */
+table{width:100%;border-collapse:collapse;font-size:.8rem}
+th{text-align:left;padding:8px 10px;color:var(--text-dim);border-bottom:1px solid var(--card-border);font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em}
+td{padding:8px 10px;border-bottom:1px solid rgba(31,41,55,.5)}
+tr:hover td{background:rgba(99,102,241,.04)}
+.status{display:inline-block;padding:2px 8px;border-radius:6px;font-size:.7rem;font-weight:600}
+.status-DONE{background:rgba(16,185,129,.15);color:#34d399}
+.status-IN_PROGRESS{background:rgba(59,130,246,.15);color:#60a5fa}
+.status-PENDING{background:rgba(156,163,175,.15);color:#9ca3af}
+.status-BLOCKED{background:rgba(239,68,68,.15);color:#f87171}
+.status-FAILED{background:rgba(239,68,68,.2);color:#ef4444}
+
+/* Timeline */
+.timeline{max-height:300px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--card-border) transparent}
+.timeline-entry{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid rgba(31,41,55,.3);font-size:.8rem;align-items:center}
+.timeline-step{min-width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:.75rem;background:rgba(99,102,241,.12);color:#818cf8}
+.timeline-action{flex:1;font-family:'Inter',monospace;color:var(--text)}
+.timeline-reward{font-weight:700;min-width:60px;text-align:right}
+.timeline-reward.positive{color:var(--green)}.timeline-reward.negative{color:var(--red)}
+
+/* Score Panel */
+.score-final{text-align:center;padding:16px 0}
+.score-final .score{font-size:3rem;font-weight:800;
+  background:linear-gradient(135deg,#818cf8,#34d399);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.score-bar{display:flex;align-items:center;gap:8px;margin:6px 0}
+.score-bar-label{font-size:.75rem;color:var(--text-dim);min-width:140px}
+.score-bar-track{flex:1;height:8px;background:rgba(31,41,55,.8);border-radius:4px;overflow:hidden}
+.score-bar-fill{height:100%;border-radius:4px;transition:width .6s ease}
+.score-bar-value{font-size:.75rem;font-weight:600;min-width:50px;text-align:right}
+
+/* Full width card */
+.full-width{grid-column:1/-1}
+
+/* Controls */
+.controls{display:flex;gap:8px;margin-bottom:16px}
+.btn{padding:8px 16px;border-radius:8px;border:1px solid var(--card-border);background:var(--card);color:var(--text);
+  cursor:pointer;font-size:.8rem;font-weight:500;transition:all .2s}
+.btn:hover{border-color:var(--accent);background:rgba(99,102,241,.08)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:white}
+.btn-primary:hover{background:var(--accent2)}
+select{padding:8px 12px;border-radius:8px;border:1px solid var(--card-border);background:var(--card);color:var(--text);font-size:.8rem}
+
+/* Empty */
+.empty{text-align:center;color:var(--text-dim);padding:40px;font-size:.85rem}
+
+/* Animations */
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.animate-in{animation:fadeIn .3s ease}
+
+/* Incident */
+.incident{padding:8px 12px;margin:4px 0;border-radius:8px;font-size:.8rem;border-left:3px solid}
+.incident-miss{background:rgba(239,68,68,.08);border-color:var(--red);color:#fca5a5}
+.incident-fp{background:rgba(245,158,11,.08);border-color:var(--amber);color:#fcd34d}
+
+/* ── Run Results ─────────────────────────────── */
+.results-panel{margin-top:8px}
+.results-title{font-size:.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);
+  margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.results-title span{font-size:1rem}
+
+.run-summary{display:flex;align-items:center;gap:16px;padding:14px 20px;margin-bottom:12px;
+  background:linear-gradient(135deg,rgba(99,102,241,.1),rgba(139,92,246,.06));
+  border:1px solid var(--card-border);border-radius:12px}
+.run-avg{font-size:1.3rem;font-weight:800;letter-spacing:-0.02em}
+.run-details{font-size:.78rem;color:var(--text-dim);flex:1}
+
+/* Tier Card */
+.tier-card{background:var(--card);border:1px solid var(--card-border);border-radius:14px;margin-bottom:12px;
+  overflow:hidden;animation:fadeIn .4s ease}
+.tier-header{display:flex;align-items:center;gap:16px;padding:16px 20px;cursor:pointer;transition:background .2s}
+.tier-header:hover{background:rgba(99,102,241,.04)}
+.tier-ring{position:relative;width:56px;height:56px;flex-shrink:0}
+.tier-ring svg{transform:rotate(-90deg)}
+.tier-ring circle{fill:none;stroke-width:6;stroke-linecap:round}
+.tier-ring .track{stroke:rgba(31,41,55,.8)}
+.tier-ring .fill{transition:stroke-dashoffset .8s ease}
+.tier-ring-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:.9rem;font-weight:800;letter-spacing:-0.02em}
+.tier-info{flex:1}
+.tier-name{font-size:.95rem;font-weight:700;margin-bottom:2px}
+.tier-meta{font-size:.75rem;color:var(--text-dim);display:flex;gap:16px;flex-wrap:wrap}
+.tier-perf{padding:3px 10px;border-radius:6px;font-size:.65rem;font-weight:700;letter-spacing:.04em;
+  text-transform:uppercase;flex-shrink:0}
+.perf-excellent{background:rgba(16,185,129,.15);color:#34d399}
+.perf-good{background:rgba(59,130,246,.15);color:#60a5fa}
+.perf-fair{background:rgba(245,158,11,.15);color:#fbbf24}
+.perf-poor{background:rgba(239,68,68,.15);color:#f87171}
+.tier-chevron{color:var(--text-dim);font-size:1.2rem;transition:transform .3s;flex-shrink:0}
+.tier-chevron.open{transform:rotate(180deg)}
+.tier-details{display:none;padding:0 20px 20px;border-top:1px solid var(--card-border)}
+.tier-details.open{display:block}
+.tier-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+
+/* Report Section */
+.report-section{background:rgba(17,24,39,.6);border:1px solid var(--card-border);border-radius:10px;padding:14px}
+.report-section-title{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--accent);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+
+/* Detection Matrix */
+.detect-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.detect-cell{text-align:center;padding:8px 4px;border-radius:8px;background:rgba(31,41,55,.5)}
+.detect-cell .num{font-size:1.2rem;font-weight:800;line-height:1}
+.detect-cell .lbl{font-size:.55rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);margin-top:3px}
+.detect-cell.tp .num{color:var(--green)}
+.detect-cell.miss .num{color:var(--red)}
+.detect-cell.fp .num{color:var(--amber)}
+
+/* Action Log */
+.action-log{max-height:180px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--card-border) transparent}
+.action-row{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;font-size:.75rem;
+  border-bottom:1px solid rgba(31,41,55,.3)}
+.action-row:hover{background:rgba(99,102,241,.04)}
+.action-num{min-width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:.65rem;background:rgba(99,102,241,.1);color:#818cf8}
+.action-text{flex:1;font-family:'Inter',monospace;color:var(--text)}
+.action-reward{font-weight:700;font-size:.75rem;min-width:44px;text-align:right}
+.action-reward.pos{color:var(--green)}.action-reward.neg{color:var(--red)}
+.action-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.action-dot.tp{background:var(--tp-green)}.action-dot.fp{background:var(--fp-red)}.action-dot.neutral{background:var(--text-dim)}
+
+/* Findings */
+.finding{display:flex;gap:8px;padding:8px 10px;margin-bottom:5px;border-radius:7px;font-size:.78rem;line-height:1.45;
+  align-items:flex-start}
+.finding-icon{font-size:.9rem;flex-shrink:0;margin-top:1px}
+.finding-good{background:rgba(16,185,129,.06);border-left:3px solid var(--green)}
+.finding-warn{background:rgba(245,158,11,.06);border-left:3px solid var(--amber)}
+.finding-bad{background:rgba(239,68,68,.06);border-left:3px solid var(--red)}
+.finding-info{background:rgba(59,130,246,.06);border-left:3px solid var(--blue)}
+</style>
+</head>
+<body>
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <h1>🛡️ MissionCtrl</h1>
+      <div class="subtitle">AI Oversight Fleet Environment Dashboard</div>
+    </div>
+    <div class="header-right">
+      <span class="badge badge-task" id="badge-task">TASK: —</span>
+      <span class="badge badge-step" id="badge-step">STEP: 0</span>
+      <span class="badge badge-done" id="badge-done" style="display:none">EPISODE DONE</span>
+      <span class="badge badge-health" id="badge-health">● LIVE</span>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <select id="task-select">
+      <option value="easy">Easy — Basic Oversight</option>
+      <option value="medium">Medium — Multi-Agent Triage</option>
+      <option value="hard">Hard — Adversarial Fleet</option>
+      <option value="special">Special — Hallucination Forensics</option>
+    </select>
+    <button class="btn btn-primary" id="btn-reset">⟳ Reset</button>
+  </div>
+
+  <!-- KPI Strip -->
+  <div class="kpi-strip">
+    <div class="kpi-card">
+      <div class="kpi-label">Cumulative Reward</div>
+      <div class="kpi-value" id="kpi-reward">0.00</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Detection Rate</div>
+      <div class="kpi-value" id="kpi-detection">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">False Positive Rate</div>
+      <div class="kpi-value" id="kpi-fp">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Tasks Completed</div>
+      <div class="kpi-value" id="kpi-tasks">0 / 0</div>
+    </div>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="grid">
+    <!-- Task Table -->
+    <div class="card">
+      <div class="card-title"><span>📋</span> Task Graph</div>
+      <table>
+        <thead><tr><th>ID</th><th>Title</th><th>Agent</th><th>Status</th></tr></thead>
+        <tbody id="task-table"><tr><td colspan="4" class="empty">Awaiting reset…</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- Action Timeline -->
+    <div class="card">
+      <div class="card-title"><span>⏱️</span> Action Timeline</div>
+      <div class="timeline" id="timeline"><div class="empty">No actions yet</div></div>
+    </div>
+
+    <!-- Score Breakdown -->
+    <div class="card" id="score-card" style="display:none">
+      <div class="card-title"><span>📊</span> Score Breakdown</div>
+      <div class="score-final">
+        <div class="score" id="score-value">—</div>
+        <div style="color:var(--text-dim);font-size:.8rem">Final Grader Score</div>
+      </div>
+      <div id="score-bars"></div>
+    </div>
+
+    <!-- Incidents -->
+    <div class="card" id="incident-card" style="display:none">
+      <div class="card-title"><span>🚨</span> Incidents</div>
+      <div id="incident-list"></div>
+    </div>
+  </div>
+
+  <!-- Accumulated Run Results (persists across tiers) -->
+  <div class="results-panel" id="results-panel" style="display:none">
+    <div class="results-title"><span>📝</span> Run Results</div>
+    <div id="run-summary"></div>
+    <div id="tier-results"></div>
+  </div>
+</div>
+
+<script>
+const API = '';
+let pollInterval = null;
+let lastHistoryLen = 0;
+let prevStep = 0;
+let prevTask = '';
+let prevDone = false;
+let completedTiers = {};
+
+// ── Polling ──────────────────────────────────────────────────────────────
+
+function startPolling() {
+  stopPolling();
+  pollInterval = setInterval(async () => {
+    try {
+      const [stateRes, histRes, resultsRes] = await Promise.all([
+        fetch(API + '/state'), fetch(API + '/history'), fetch(API + '/results')
+      ]);
+      if (!stateRes.ok || !histRes.ok) return;
+      const state = await stateRes.json();
+      const history = await histRes.json();
+      updateDashboard(state, history);
+
+      // Hydrate any missed completed tiers from server-side accumulated results
+      if (resultsRes && resultsRes.ok) {
+        const serverResults = await resultsRes.json();
+        for (const r of serverResults) {
+          const tier = (r.tier || '').toLowerCase();
+          if (tier && !completedTiers[tier]) {
+            appendTierResult(
+              r.state || {difficulty: tier, tasks: []},
+              r.history || [],
+              r.score_breakdown || {},
+              r.hallucination_stats || {}
+            );
+          }
+        }
+      }
+
+      document.getElementById('badge-health').textContent = '● LIVE';
+      document.getElementById('badge-health').classList.remove('offline');
+    } catch {
+      document.getElementById('badge-health').textContent = '● OFFLINE';
+      document.getElementById('badge-health').classList.add('offline');
+    }
+  }, 1500);
+}
+
+function stopPolling() { if (pollInterval) { clearInterval(pollInterval); pollInterval = null; } }
+
+// Reset only the live episode panels — NOT the accumulated results
+function resetLivePanels() {
+  lastHistoryLen = 0;
+  document.getElementById('score-card').style.display = 'none';
+  document.getElementById('incident-card').style.display = 'none';
+  document.getElementById('kpi-detection').textContent = '—';
+  document.getElementById('kpi-detection').className = 'kpi-value';
+  document.getElementById('kpi-fp').textContent = '—';
+  document.getElementById('kpi-fp').className = 'kpi-value';
+}
+
+// Full reset — clears everything including accumulated results (manual reset only)
+function resetAll() {
+  resetLivePanels();
+  completedTiers = {};
+  document.getElementById('results-panel').style.display = 'none';
+  document.getElementById('tier-results').innerHTML = '';
+  document.getElementById('run-summary').innerHTML = '';
+}
+
+// ── Dashboard Update ─────────────────────────────────────────────────────
+
+function updateDashboard(state, history) {
+  const currentTask = (state.difficulty || '');
+  const currentStep = Number(state.time_step || 0);
+
+  const newEpisodeDetected =
+    currentStep < prevStep ||
+    (history.length < lastHistoryLen) ||
+    (prevDone && !state.done) ||
+    (prevTask && currentTask && prevTask !== currentTask && currentStep <= 1);
+
+  if (newEpisodeDetected) {
+    resetLivePanels();  // Only reset live panels, keep results
+  }
+
+  // Header badges
+  document.getElementById('badge-task').textContent = `TASK: ${(currentTask || '—').toUpperCase()}`;
+  document.getElementById('badge-step').textContent = `STEP: ${state.time_step || 0} / ${state.max_steps || 5}`;
+  const doneEl = document.getElementById('badge-done');
+  if (state.done) { doneEl.style.display = ''; } else { doneEl.style.display = 'none'; }
+
+  // KPIs
+  const cumReward = history.reduce((s, h) => s + (h.reward || 0), 0);
+  const rewardEl = document.getElementById('kpi-reward');
+  rewardEl.textContent = cumReward.toFixed(2);
+  rewardEl.className = 'kpi-value ' + (cumReward > 0 ? 'good' : cumReward < -2 ? 'bad' : 'warn');
+
+  const tasks = state.tasks || [];
+  const doneCount = tasks.filter(t => t.status === 'DONE').length;
+  document.getElementById('kpi-tasks').textContent = `${doneCount} / ${tasks.length}`;
+
+  // Live detection KPIs
+  const liveStats = state.hallucination_stats || {};
+  if (liveStats.total_flags > 0 || liveStats.total_injected > 0) {
+    const dr = liveStats.total_injected > 0 ? ((liveStats.total_caught / liveStats.total_injected) * 100) : 100;
+    const drEl = document.getElementById('kpi-detection');
+    drEl.textContent = dr.toFixed(0) + '%';
+    drEl.className = 'kpi-value ' + (dr >= 85 ? 'good' : dr >= 50 ? 'warn' : 'bad');
+
+    const fpRate = liveStats.total_flags > 0 ? ((liveStats.false_positives / liveStats.total_flags) * 100) : 0;
+    const fpEl = document.getElementById('kpi-fp');
+    fpEl.textContent = fpRate.toFixed(0) + '%';
+    fpEl.className = 'kpi-value ' + (fpRate <= 10 ? 'good' : fpRate <= 25 ? 'warn' : 'bad');
+  }
+
+  // Task table
+  const tbody = document.getElementById('task-table');
+  if (tasks.length > 0) {
+    tbody.innerHTML = tasks.map(t => `
+      <tr class="animate-in">
+        <td style="font-family:monospace;font-size:.75rem">${t.task_id}</td>
+        <td>${t.title}</td>
+        <td style="font-size:.75rem;color:var(--text-dim)">${t.assigned_agent}</td>
+        <td><span class="status status-${t.status}">${t.status}</span></td>
+      </tr>
+    `).join('');
+  }
+
+  // Timeline
+  if (history.length !== lastHistoryLen) {
+    lastHistoryLen = history.length;
+    const tl = document.getElementById('timeline');
+    if (history.length === 0) {
+      tl.innerHTML = '<div class="empty">No actions yet</div>';
+    } else {
+      tl.innerHTML = history.map(h => {
+        const rClass = (h.reward || 0) >= 0 ? 'positive' : 'negative';
+        const rSign = (h.reward || 0) >= 0 ? '+' : '';
+        return `<div class="timeline-entry animate-in">
+          <div class="timeline-step">${h.step}</div>
+          <div class="timeline-action">${h.action || '—'}</div>
+          <div class="timeline-reward ${rClass}">${rSign}${(h.reward || 0).toFixed(1)}</div>
+        </div>`;
+      }).join('');
+      tl.scrollTop = tl.scrollHeight;
+    }
+  }
+
+  // Score breakdown (on done)
+  const lastEntry = history.length > 0 ? history[history.length - 1] : null;
+  if (state.done && lastEntry && lastEntry.info && lastEntry.info.score_breakdown) {
+    const sb = lastEntry.info.score_breakdown;
+    document.getElementById('score-card').style.display = '';
+    document.getElementById('score-value').textContent = sb.final_score.toFixed(4);
+
+    const signals = sb.signals || {};
+    let barsHtml = '';
+    const colors = {
+      task_completion: '#10b981', hallucination_detection: '#3b82f6',
+      false_positive_penalty: '#ef4444', delegation_efficiency: '#8b5cf6',
+      llm_judge_quality: '#f59e0b'
+    };
+    for (const [key, sig] of Object.entries(signals)) {
+      const pct = Math.abs(sig.value) * 100;
+      const label = key.replace(/_/g, ' ');
+      const color = colors[key] || '#6366f1';
+      barsHtml += `<div class="score-bar">
+        <div class="score-bar-label">${label}</div>
+        <div class="score-bar-track"><div class="score-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+        <div class="score-bar-value" style="color:${color}">${sig.contribution >= 0 ? '+' : ''}${sig.contribution.toFixed(3)}</div>
+      </div>`;
+    }
+    document.getElementById('score-bars').innerHTML = barsHtml;
+
+    const stats = sb.hallucination_stats || {};
+    const dr = stats.total_injected > 0 ? ((stats.total_caught / stats.total_injected) * 100) : 100;
+    document.getElementById('kpi-detection').textContent = dr.toFixed(0) + '%';
+    document.getElementById('kpi-detection').className = 'kpi-value ' + (dr >= 85 ? 'good' : dr >= 50 ? 'warn' : 'bad');
+
+    const fpRate = stats.total_flags > 0 ? ((stats.false_positives / stats.total_flags) * 100) : 0;
+    document.getElementById('kpi-fp').textContent = fpRate.toFixed(0) + '%';
+    document.getElementById('kpi-fp').className = 'kpi-value ' + (fpRate <= 10 ? 'good' : fpRate <= 25 ? 'warn' : 'bad');
+
+    if (stats.total_injected > stats.total_caught || stats.false_positives > 0) {
+      document.getElementById('incident-card').style.display = '';
+      let html = '';
+      const missed = stats.total_injected - stats.total_caught;
+      if (missed > 0) html += `<div class="incident incident-miss">⚠️ ${missed} hallucination(s) went undetected</div>`;
+      if (stats.false_positives > 0) html += `<div class="incident incident-fp">⚠️ ${stats.false_positives} false positive flag(s)</div>`;
+      document.getElementById('incident-list').innerHTML = html;
+    }
+
+    // Accumulate this tier's result (persists across episodes)
+    appendTierResult(state, history, sb, stats);
+  }
+
+  prevStep = currentStep;
+  prevTask = currentTask;
+  prevDone = !!state.done;
+}
+
+// ── Accumulated Tier Results ─────────────────────────────────────────────
+
+function appendTierResult(state, history, sb, stats) {
+  const tier = (state.difficulty || 'easy').toLowerCase();
+  if (completedTiers[tier]) return;  // already recorded
+
+  const score = sb.final_score || 0;
+  const steps = history.length;
+  const cumReward = history.reduce((s, h) => s + (h.reward || 0), 0);
+  completedTiers[tier] = { score, steps, cumReward };
+
+  document.getElementById('results-panel').style.display = '';
+
+  // Performance label
+  let perfClass, perfLabel;
+  if (score >= 0.8) { perfClass = 'perf-excellent'; perfLabel = 'Excellent'; }
+  else if (score >= 0.55) { perfClass = 'perf-good'; perfLabel = 'Good'; }
+  else if (score >= 0.3) { perfClass = 'perf-fair'; perfLabel = 'Fair'; }
+  else { perfClass = 'perf-poor'; perfLabel = 'Poor'; }
+
+  const r = 22, c = 2 * Math.PI * r;
+  const offset = c - (score * c);
+  const ringColor = score >= 0.8 ? '#10b981' : score >= 0.55 ? '#3b82f6' : score >= 0.3 ? '#f59e0b' : '#ef4444';
+  const missed = stats.total_injected - stats.total_caught;
+
+  const el = document.createElement('div');
+  el.className = 'tier-card';
+  el.innerHTML = `
+    <div class="tier-header" onclick="toggleDetails('${tier}')">
+      <div class="tier-ring">
+        <svg width="56" height="56" viewBox="0 0 56 56">
+          <circle class="track" cx="28" cy="28" r="${r}"/>
+          <circle class="fill" cx="28" cy="28" r="${r}"
+            stroke="${ringColor}" stroke-dasharray="${c.toFixed(1)}"
+            stroke-dashoffset="${offset.toFixed(1)}"/>
+        </svg>
+        <div class="tier-ring-label" style="color:${ringColor}">${(score * 100).toFixed(0)}%</div>
+      </div>
+      <div class="tier-info">
+        <div class="tier-name">${tier.toUpperCase()}</div>
+        <div class="tier-meta">
+          <span>⏱ ${steps} steps</span>
+          <span>🎯 TP:${stats.true_positives || 0}</span>
+          <span>❌ Missed:${missed}</span>
+          <span>🚩 FP:${stats.false_positives || 0}</span>
+          <span>${cumReward >= 0 ? '+' : ''}${cumReward.toFixed(1)} reward</span>
+        </div>
+      </div>
+      <span class="tier-perf ${perfClass}">${perfLabel}</span>
+      <span class="tier-chevron" id="chev-${tier}">▼</span>
+    </div>
+    <div class="tier-details" id="det-${tier}">
+      <div class="tier-grid">
+        <div class="report-section">
+          <div class="report-section-title">🎯 Detection Matrix</div>
+          <div class="detect-grid">
+            <div class="detect-cell tp"><div class="num">${stats.true_positives || 0}</div><div class="lbl">True Pos</div></div>
+            <div class="detect-cell miss"><div class="num">${missed}</div><div class="lbl">Missed</div></div>
+            <div class="detect-cell fp"><div class="num">${stats.false_positives || 0}</div><div class="lbl">False Pos</div></div>
+          </div>
+        </div>
+        <div class="report-section">
+          <div class="report-section-title">📋 Action Log</div>
+          <div class="action-log">${buildActionLog(history)}</div>
+        </div>
+      </div>
+      <div class="report-section" style="margin-top:14px">
+        <div class="report-section-title">🔍 Findings & Problems</div>
+        ${buildFindings(sb, stats, history, state)}
+      </div>
+    </div>`;
+
+  document.getElementById('tier-results').appendChild(el);
+  updateRunSummary();
+}
+
+function toggleDetails(tier) {
+  const d = document.getElementById(`det-${tier}`);
+  const c = document.getElementById(`chev-${tier}`);
+  d.classList.toggle('open');
+  c.classList.toggle('open');
+}
+
+function buildActionLog(history) {
+  return history.map(h => {
+    const rc = (h.reward || 0) >= 0 ? 'pos' : 'neg';
+    const rs = (h.reward || 0) >= 0 ? '+' : '';
+    const at = (h.info || {}).action_type || '';
+    let dot = 'neutral';
+    if (at === 'FLAG') dot = (h.reward || 0) > 0 ? 'tp' : 'fp';
+    return `<div class="action-row">
+      <div class="action-num">${h.step}</div>
+      <div class="action-dot ${dot}"></div>
+      <div class="action-text">${h.action || 'NOOP'}</div>
+      <div class="action-reward ${rc}">${rs}${(h.reward || 0).toFixed(1)}</div>
+    </div>`;
+  }).join('');
+}
+
+function buildFindings(sb, stats, history, state) {
+  const f = [];
+  const sig = sb.signals || {};
+  const s1 = sig.task_completion, s2 = sig.hallucination_detection;
+  const s3 = sig.false_positive_penalty, s5 = sig.llm_judge_quality;
+
+  if (s2 && s2.value >= 1.0) f.push({t:'good',i:'✅',m:`All ${stats.total_injected} hallucination(s) detected — perfect.`});
+  else if (s2 && s2.value > 0) f.push({t:'warn',i:'⚠️',m:`${stats.total_caught}/${stats.total_injected} hallucination(s) detected (${(s2.value*100).toFixed(0)}%).`});
+  else if (stats.total_injected > 0) f.push({t:'bad',i:'❌',m:`Zero hallucinations detected out of ${stats.total_injected}.`});
+
+  if (stats.false_positives > 0) f.push({t:'warn',i:'🚩',m:`${stats.false_positives} false positive(s) — costs −${Math.abs(s3?s3.contribution:0).toFixed(3)}.`});
+  else if (stats.total_flags > 0) f.push({t:'good',i:'🎯',m:'Zero false positives — all flags accurate.'});
+
+  if (s1 && s1.value >= 1.0) f.push({t:'good',i:'✅',m:'All tasks completed correctly.'});
+  else if (s1) { const n=Math.round(s1.value*(state.tasks||[]).length); f.push({t:'info',i:'📋',m:`${n}/${(state.tasks||[]).length} tasks completed correctly.`}); }
+
+  const noops = history.filter(h=>(h.action||'').trim()==='NOOP').length;
+  if (noops > 0) f.push({t:'warn',i:'💤',m:`${noops} NOOP(s) — wasted steps (−0.1 each).`});
+
+  const bad = history.filter(h=>(h.info||{}).action_type==='APPROVE'&&(h.reward||0)<=-1.5);
+  if (bad.length > 0) f.push({t:'bad',i:'💀',m:`${bad.length} hallucinated task(s) APPROVED without flagging (−2.0 each).`});
+
+  const bs = history.filter(h=>(h.action||'').startsWith('SYNTHESIZE')&&(h.reward||0)<0);
+  if (bs.length > 0) f.push({t:'bad',i:'⛔',m:'Premature SYNTHESIZE_REPORT with uncaught hallucinations (−3.0).'});
+
+  if (s5 && s5.value < 0.5) f.push({t:'info',i:'📝',m:'FLAG evidence quality low — use domain keywords.'});
+  if (f.length === 0) f.push({t:'good',i:'🏆',m:'No issues — strong oversight performance.'});
+
+  return f.map(x=>`<div class="finding finding-${x.t}"><span class="finding-icon">${x.i}</span><div>${x.m}</div></div>`).join('');
+}
+
+function updateRunSummary() {
+  const tiers = Object.keys(completedTiers);
+  if (tiers.length === 0) return;
+
+  const scores = tiers.map(t => completedTiers[t].score);
+  const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+  const totalSteps = tiers.reduce((s, t) => s + completedTiers[t].steps, 0);
+  const avgColor = avg >= 0.8 ? '#10b981' : avg >= 0.55 ? '#3b82f6' : avg >= 0.3 ? '#f59e0b' : '#ef4444';
+
+  const chips = tiers.map(t => {
+    const s = completedTiers[t].score;
+    const c = s >= 0.8 ? '#10b981' : s >= 0.55 ? '#3b82f6' : s >= 0.3 ? '#f59e0b' : '#ef4444';
+    return `<span style="color:${c};font-weight:700">${t.toUpperCase()}: ${(s*100).toFixed(0)}%</span>`;
+  }).join(' · ');
+
+  document.getElementById('run-summary').innerHTML = `
+    <div class="run-summary">
+      <div class="run-avg" style="color:${avgColor}">${(avg*100).toFixed(0)}%</div>
+      <div class="run-details">
+        <div style="margin-bottom:2px">Average across <strong>${tiers.length}</strong> tier(s) · ${totalSteps} total steps</div>
+        <div>${chips}</div>
+      </div>
+    </div>`;
+}
+
+// ── Reset ────────────────────────────────────────────────────────────────
+
+document.getElementById('btn-reset').addEventListener('click', async () => {
+  const taskId = document.getElementById('task-select').value;
+  try {
+    await fetch(API + '/reset', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({task_id: taskId})
+    });
+    resetAll();  // Manual reset clears everything
+    prevStep = 0;
+    prevTask = taskId;
+    prevDone = false;
+    startPolling();
+  } catch (e) { console.error('Reset failed', e); }
+});
+
+// Start polling on load
+startPolling();
+</script>
+</body>
+</html>

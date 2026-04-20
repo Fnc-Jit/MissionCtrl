@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openenv-missionctrl-env"
+version = "1.0.0"
+description = "MissionCtrl: AI Oversight Fleet Environment — trains an LLM overseer to detect hallucinations from a fleet of AI sub-agents"
+requires-python = ">=3.10"
+dependencies = [
+    "openenv-core[core]>=0.2.2",
+    "numpy>=1.26.0",
+    "openai>=1.3.0",
+    "httpx>=0.25.0",
+    "python-dotenv>=1.0.0",
+    "tenacity>=8.2.0",
+    "pyyaml>=6.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.20.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+inference = [
+    "openai>=1.3.0",
+    "httpx>=0.25.0",
+    "tenacity>=8.2.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.scripts]
+server = "missionctrl.server.app:main"
+
+[tool.setuptools]
+include-package-data = true
+packages = ["missionctrl", "missionctrl.server"]
+package-dir = { "missionctrl" = ".", "missionctrl.server" = "server" }

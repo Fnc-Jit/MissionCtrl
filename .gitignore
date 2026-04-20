@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.env
+.DS_Store
+*.lock
+dist/
+build/
+missionctrl_checkpoints/
+reward_curve.png
