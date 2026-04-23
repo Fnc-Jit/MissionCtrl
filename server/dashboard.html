@@ -276,6 +276,40 @@ function resetEpisodePanels() {
   document.getElementById('kpi-fp').className = 'kpi-value';
 }
 
+function pickMetric(...values) {
+  for (const v of values) {
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
+  }
+  return 0;
+}
+
+function updateHallucinationKpis(stats, hasTasks) {
+  const drEl = document.getElementById('kpi-detection');
+  const fpEl = document.getElementById('kpi-fp');
+
+  if (!hasTasks) {
+    drEl.textContent = '—';
+    drEl.className = 'kpi-value';
+    fpEl.textContent = '—';
+    fpEl.className = 'kpi-value';
+    return;
+  }
+
+  const totalInjected = pickMetric(stats.total_injected, stats.injected, stats.num_injected);
+  const totalCaught = pickMetric(stats.total_caught, stats.true_positives, stats.caught);
+  const totalFlags = pickMetric(stats.total_flags, stats.flags);
+  const falsePositives = pickMetric(stats.false_positives, stats.false_positive_count, stats.fp);
+
+  const dr = totalInjected > 0 ? (totalCaught / totalInjected) * 100 : 100;
+  drEl.textContent = dr.toFixed(0) + '%';
+  drEl.className = 'kpi-value ' + (dr >= 85 ? 'good' : dr >= 50 ? 'warn' : 'bad');
+
+  const fpRate = totalFlags > 0 ? (falsePositives / totalFlags) * 100 : 0;
+  fpEl.textContent = fpRate.toFixed(0) + '%';
+  fpEl.className = 'kpi-value ' + (fpRate <= 10 ? 'good' : fpRate <= 25 ? 'warn' : 'bad');
+}
+
 // ── Dashboard Update ─────────────────────────────────────────────────────
 
 function updateDashboard(state, history) {
@@ -308,6 +342,10 @@ function updateDashboard(state, history) {
   const tasks = state.tasks || [];
   const doneCount = tasks.filter(t => t.status === 'DONE').length;
   document.getElementById('kpi-tasks').textContent = `${doneCount} / ${tasks.length}`;
+
+  // Keep detection/FP KPIs live during the episode.
+  const liveStats = state.hallucination_stats || {};
+  updateHallucinationKpis(liveStats, tasks.length > 0);
 
   // Task table
   const tbody = document.getElementById('task-table');
@@ -368,17 +406,9 @@ function updateDashboard(state, history) {
     }
     document.getElementById('score-bars').innerHTML = barsHtml;
 
-    // Detection KPIs
+    // Prefer final stats after episode completion.
     const stats = sb.hallucination_stats || {};
-    const dr = stats.total_injected > 0 ? ((stats.total_caught / stats.total_injected) * 100) : 100;
-    const drEl = document.getElementById('kpi-detection');
-    drEl.textContent = dr.toFixed(0) + '%';
-    drEl.className = 'kpi-value ' + (dr >= 85 ? 'good' : dr >= 50 ? 'warn' : 'bad');
-
-    const fpRate = stats.total_flags > 0 ? ((stats.false_positives / stats.total_flags) * 100) : 0;
-    const fpEl = document.getElementById('kpi-fp');
-    fpEl.textContent = fpRate.toFixed(0) + '%';
-    fpEl.className = 'kpi-value ' + (fpRate <= 10 ? 'good' : fpRate <= 25 ? 'warn' : 'bad');
+    updateHallucinationKpis(stats, tasks.length > 0);
 
     // Incidents
     if (stats.total_injected > stats.total_caught || stats.false_positives > 0) {

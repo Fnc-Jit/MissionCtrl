@@ -44,11 +44,40 @@ A real-time visualization dashboard at `/dashboard` shows:
 - Action timeline with reward indicators
 - **Accumulated run results** that persist across tiers with expandable per-tier reports
 
+![MissionCtrl Dashboard](Asset/l%20Missionctrl%20TASK.png)
+
+#### Run Results Breakdown
+The Run Results panel now supports expandable per-tier drilldowns for:
+- Score breakdown contributions by signal
+- Hallucination stats (injected/caught/TP/FP)
+- Action-by-action reward history
+
+![Run Results Panel](Asset/SCR-20260423-ordo.png)
+
 ### 🔄 Deterministic Replay
 Every episode can be deterministically replayed via seeded randomness, enabling reproducible debugging and benchmarking.
 
 ### 🐳 Single-Container Deployment
 Server + inference in one Docker image. No orchestration, no external databases — just `docker run` and go.
+
+### 🧾 Verbose LLM Trace View
+When `VERBOSE_TRACE=1`, inference prints compact boxed traces for each step:
+- Prompt metadata (including char count)
+- Prompt preview for fast debugging
+- Action normalization and guardrail rewrites
+- Step transition outcomes and rewards
+
+![LLM Prompt Trace](Asset/SCR-20260423-oqsn.png)
+
+![LLM Response Trace](Asset/SCR-20260423-orzh.png)
+
+### 🚦 Token-Budget Guardrails
+Inference now includes hardening for provider token limits:
+- **Stateless per-step LLM requests** (fresh system + current observation only)
+- **No retry loop for permanent oversized-request errors**
+- Retry/backoff remains enabled for transient provider throttling
+
+This prevents late-step context blowups (for example, step 5 payload growth) from repeatedly failing with the same "request too large" response.
 
 ---
 
@@ -204,12 +233,28 @@ pytest tests/ -v
 
 | Variable | Default | Description |
 |---|---|---|
-| `API_BASE_URL` | `https://api.groq.com/openai/v1` | LLM API endpoint |
-| `MODEL_NAME` | `llama-3.3-70b-versatile` | Model to use |
+| `API_BASE_URL` | `https://router.huggingface.co/v1` | OpenAI-compatible LLM API endpoint |
+| `MODEL_NAME` | `openai/gpt-oss-120b` | Model to use |
 | `HF_TOKEN` | — | API key |
-| `STEP_DELAY_S` | `0.5` | Delay between steps (reduce for speed) |
+| `ENV_BASE_URL` | `http://localhost:8000` | MissionCtrl server base URL |
+| `STEP_DELAY_S` | `4.0` | Delay between steps (reduce for speed) |
 | `VERBOSE_TRACE` | `1` | Show detailed step traces |
+| `PROMPT_PREVIEW_CHARS` | `200` | Prompt preview truncation length in trace logs |
+| `TRACE_WRAP_WIDTH` | `76` | Text wrap width for trace block content |
+| `TRACE_BOX_WIDTH` | `76` | Width of the boxed trace output |
+| `SPINNER_ENABLED` | `0` | Enable CLI spinner while waiting for LLM response |
 | `MAX_STEPS` | `5` | Steps per episode |
+
+### Troubleshooting: Request Too Large / TPM Errors
+
+If your provider returns errors like:
+`Request too large ... tokens per minute ... Requested > Limit`
+
+Use this checklist:
+1. Ensure you are running the latest image/code with stateless per-step requests.
+2. Reduce verbosity/observation size if needed (fewer long output snippets).
+3. Switch to a model/tier with higher TPM limits.
+4. Keep retries for transient rate limits; oversized requests are now treated as non-retryable.
 
 ---
 

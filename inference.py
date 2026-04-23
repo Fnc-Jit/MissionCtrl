@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import httpx
 from dotenv import load_dotenv
 from openai import OpenAI
-from tenacity import retry, stop_after_attempt, wait_exponential, before_sleep_log
+from tenacity import retry, stop_after_attempt, wait_exponential, before_sleep_log, retry_if_not_exception_type
 import logging as _logging
 
 # ---------------------------------------------------------------------------
@@ -94,6 +94,11 @@ TRACE_WRAP_WIDTH: int = int(os.environ.get("TRACE_WRAP_WIDTH", "76"))
 TRACE_BOX_WIDTH: int = int(os.environ.get("TRACE_BOX_WIDTH", "76"))
 SPINNER_ENABLED: bool = os.environ.get("SPINNER_ENABLED", "0").strip().lower() in {"1", "true", "yes"}
 _retry_logger = _logging.getLogger("missionctrl.retry")
+
+
+class PromptTooLargeError(RuntimeError):
+    """Raised when provider rejects a request as permanently oversized."""
+
 
 
 def _append_bounded_unique(bucket: List[str], value: str, limit: int) -> None:
@@ -685,6 +690,7 @@ def _spinner(msg: str = "🤖 Asking LLM"):
     stop=stop_after_attempt(LLM_MAX_RETRIES),
     wait=wait_exponential(multiplier=2, min=2, max=30),
     before_sleep=before_sleep_log(_retry_logger, _logging.WARNING),
+    retry=retry_if_not_exception_type(PromptTooLargeError),
     reraise=True,
 )
 def _call_llm(messages: List[Dict[str, str]]) -> str:
@@ -698,6 +704,9 @@ def _call_llm(messages: List[Dict[str, str]]) -> str:
         )
     except Exception as exc:
         msg = str(exc)
+        lower_msg = msg.lower()
+        if "request too large" in lower_msg or ("tokens per minute" in lower_msg and "requested" in lower_msg):
+            raise PromptTooLargeError(f"Prompt too large: {msg.splitlines()[0]}") from exc
         if "429" in msg or "rate_limit" in msg.lower():
             raise RuntimeError(f"Rate-limited: {msg.splitlines()[0]}") from exc
         raise
@@ -834,7 +843,7 @@ def run_task(task_id: str, policy_memory: PolicyMemory) -> float:
     done = False
 
     try:
-        messages: List[Dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+        system_message = {"role": "system", "content": SYSTEM_PROMPT}
         action_history: List[str] = []
         episode_memory = EpisodeMemory()
 
@@ -850,7 +859,10 @@ def run_task(task_id: str, policy_memory: PolicyMemory) -> float:
                 episode_memory,
                 policy_memory,
             )
-            messages.append({"role": "user", "content": user_msg})
+            messages: List[Dict[str, str]] = [
+                system_message,
+                {"role": "user", "content": user_msg},
+            ]
             before_obs = obs
 
             if VERBOSE_TRACE:
@@ -872,7 +884,6 @@ def run_task(task_id: str, policy_memory: PolicyMemory) -> float:
                 raw_action = "NOOP"
 
             safe_action = _normalize_action(raw_action, obs, episode_memory)
-            messages.append({"role": "assistant", "content": safe_action})
 
             extracted = _extract_action_from_response(raw_action)
             was_cleaned = raw_action.strip() != extracted
