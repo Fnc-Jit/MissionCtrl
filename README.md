@@ -1,3 +1,17 @@
+---
+title: Mission Control
+emoji: "☁️"
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+tags:
+  - finops
+  - openenv
+  - fastapi
+  - observability
+  - dashboard
+---
+
 # 🛡️ MissionCtrl — AI Oversight Fleet Environment
 
 > *Every LLM agent fleet will hallucinate. MissionCtrl trains the overseer to catch them.*
@@ -204,7 +218,7 @@ docker build -t missionctrl .
 docker run -p 8000:8000 --name missionctrl missionctrl
 
 # 3. Run the baseline agent (in another terminal)
-docker exec -it missionctrl python inference.py
+docker exec -it missionctrl python client.py
 
 # 4. Watch the dashboard
 open http://localhost:8000/dashboard
@@ -222,8 +236,8 @@ python -m uvicorn server.app:app --host 0.0.0.0 --port 8000
 # Configure API keys
 cp .env.example .env   # fill in your LLM provider keys
 
-# Run inference
-python inference.py
+# Run inference (OpenEnv canonical entrypoint)
+python client.py
 
 # Run tests
 pytest tests/ -v
@@ -301,7 +315,8 @@ missionctrl/
 ├── openenv.yaml           # OpenEnv manifest
 ├── pyproject.toml         # Python project config
 ├── Dockerfile             # Single-container deployment
-├── inference.py           # Baseline LLM agent + cross-episode memory
+├── client.py              # OpenEnv-required baseline evaluator entrypoint
+├── inference.py           # Backward-compatible wrapper to client.main()
 ├── .env.example           # API key template
 ├── server/
 │   ├── app.py             # FastAPI server (6 endpoints + dashboard)
@@ -343,12 +358,50 @@ missionctrl/
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/` | Status heartbeat |
-| `GET` | `/health` | Readiness check (`{"status": "ok"}`) |
+| `GET` | `/health` | Readiness check (`{"healthy": true, "env": "missionctrl"}`) |
 | `POST` | `/reset` | `{"task_id": "easy"}` → Reset environment for tier |
 | `POST` | `/step` | `{"action": "FLAG(task_01, \"evidence\")"}` → Execute action |
-| `GET` | `/state` | Current observation + live hallucination stats |
+| `GET` | `/state` | Runtime-aware observation payload + build/container metadata |
+| `GET` | `/logs` | Structured logs summary (status/path counters + recent requests) |
 | `GET` | `/history` | Full action/reward timeline (JSON array) |
 | `GET` | `/dashboard` | Live visualization UI |
+
+---
+
+## HF Spaces Health and Logs
+
+The Space now exposes two `200 OK` observability endpoints intended for build/runtime diagnostics:
+
+- `GET /state` returns:
+  - `status`
+  - `build` metadata (`container_id`, `build_id`, `git_sha`, `started_at`)
+  - current environment `observation`
+- `GET /logs` returns:
+  - `status`
+  - `build` metadata
+  - aggregate `totals`, `statuses`, and `paths`
+  - recent request `entries` with `method`, `path`, `status_code`, and `duration_ms`
+
+Quick check:
+
+```bash
+python scripts.py
+```
+
+---
+
+## OpenEnv Required Files
+
+OpenEnv validation expects a root-level `client.py`. This repository now provides:
+
+- `client.py` as the canonical OpenEnv evaluator script
+- `inference.py` as a compatibility wrapper for legacy commands
+
+Preferred command:
+
+```bash
+python client.py
+```
 
 ---
 

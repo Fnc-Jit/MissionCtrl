@@ -28,6 +28,12 @@ class TestRootEndpoint:
         data = client.get("/").json()
         assert data["name"] == "missionctrl"
 
+    def test_root_has_heartbeat_and_logs(self):
+        data = client.get("/").json()
+        assert "heartbeat" in data
+        assert "log_summary" in data
+        assert "uptime_seconds" in data
+
 
 class TestHealthEndpoint:
     def test_health_returns_200(self):
@@ -37,6 +43,11 @@ class TestHealthEndpoint:
     def test_health_has_healthy(self):
         data = client.get("/health").json()
         assert data["healthy"] is True
+
+    def test_health_has_detailed_heartbeat_fields(self):
+        data = client.get("/health").json()
+        for key in ["status", "service", "container_id", "port", "timestamp_utc", "uptime_seconds"]:
+            assert key in data
 
 
 class TestResetEndpoint:
@@ -96,6 +107,33 @@ class TestStateEndpoint:
         client.post("/reset", json={"task_id": "easy"})
         data = client.get("/state").json()
         assert "tasks" in data
+        assert "timestamp_utc" in data
+
+
+class TestHeartbeatEndpoints:
+    def test_web_returns_200(self):
+        resp = client.get("/web")
+        assert resp.status_code == 200
+
+    def test_ports_returns_200(self):
+        resp = client.get("/ports")
+        assert resp.status_code == 200
+
+    def test_dashboard_ping_returns_200(self):
+        resp = client.get("/dashboard/ping")
+        assert resp.status_code == 200
+
+    def test_web_and_ports_have_required_fields(self):
+        web = client.get("/web").json()
+        ports = client.get("/ports").json()
+        for payload in [web, ports]:
+            for key in ["status", "service", "build_id", "runtime", "host", "port", "timestamp_utc"]:
+                assert key in payload
+
+    def test_ports_payload_has_port_details(self):
+        data = client.get("/ports").json()
+        assert "details" in data
+        assert "known_open_ports" in data["details"]
 
 
 class TestHistoryEndpoint:
