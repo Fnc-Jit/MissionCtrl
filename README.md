@@ -215,10 +215,10 @@ Per-step rewards provide immediate feedback:
 docker build -t missionctrl .
 
 # 2. Start the server
-docker run -p 8000:8000 --name missionctrl missionctrl
+docker run -p 8000:7860 --name missionctrl missionctrl
 
 # 3. Run the baseline agent (in another terminal)
-docker exec -it missionctrl python client.py
+docker exec -it missionctrl python inference.py
 
 # 4. Watch the dashboard
 open http://localhost:8000/dashboard
