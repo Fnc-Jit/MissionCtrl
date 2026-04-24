@@ -6,11 +6,15 @@ across /reset and /step calls.
 
 import logging
 import os
+import socket
 import sys
+import time
 from contextlib import asynccontextmanager
+from collections import Counter, deque
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
@@ -23,6 +27,7 @@ if _parent not in sys.path:
     sys.path.insert(0, _parent)
 
 from server.environment import MissionCtrlEnvironment
+from models import BuildMetadata, HeartbeatResponse, LogsSummaryResponse, RequestLogEntry
 
 # ---------------------------------------------------------------------------
 # Logging — suppress noisy poll endpoints
@@ -44,10 +49,29 @@ log = logging.getLogger("missionctrl")
 logging.getLogger("uvicorn.access").addFilter(_PollFilter())
 
 # ---------------------------------------------------------------------------
-# Singleton environment
+# Singleton environment (lazy-loaded for faster startup)
 # ---------------------------------------------------------------------------
-_env = MissionCtrlEnvironment()
+_env: Optional[MissionCtrlEnvironment] = None
 _completed_results: List[Dict[str, Any]] = []  # Accumulated episode results across tiers
+_MAX_LOG_ENTRIES = int(os.getenv("LOG_BUFFER_SIZE", "250"))
+_request_logs: deque[RequestLogEntry] = deque(maxlen=_MAX_LOG_ENTRIES)
+_build_metadata = BuildMetadata(
+    container_id=os.getenv("HOSTNAME", "unknown"),
+    build_id=os.getenv("SPACE_ID", os.getenv("BUILD_ID", "unknown")),
+    git_sha=os.getenv("GIT_SHA", os.getenv("HF_SPACE_COMMIT_SHA", "unknown")),
+    started_at=datetime.now(timezone.utc),
+)
+_started_at_monotonic = time.monotonic()
+_APP_PORT = int(os.getenv("PORT", "7860"))
+_APP_HOST = os.getenv("HOST", "0.0.0.0")
+
+
+def _get_env() -> MissionCtrlEnvironment:
+    """Lazy-load the environment on first access."""
+    global _env
+    if _env is None:
+        _env = MissionCtrlEnvironment()
+    return _env
 
 # ---------------------------------------------------------------------------
 # Request / Response models
@@ -100,6 +124,16 @@ async def lifespan(_: FastAPI):
     """
     print(banner)
     log.info("Server started — using persistent singleton environment")
+    _request_logs.append(
+        RequestLogEntry(
+            timestamp=datetime.now(timezone.utc),
+            method="SYSTEM",
+            path="/startup",
+            status_code=200,
+            duration_ms=0.0,
+            container_id=_build_metadata.container_id,
+        )
+    )
     yield
 
 
@@ -118,18 +152,53 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def request_logger(request: Request, call_next):
+    started = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = round((time.perf_counter() - started) * 1000, 2)
+    _request_logs.append(
+        RequestLogEntry(
+            timestamp=datetime.now(timezone.utc),
+            method=request.method,
+            path=request.url.path,
+            status_code=response.status_code,
+            duration_ms=duration_ms,
+            container_id=_build_metadata.container_id,
+        )
+    )
+    return response
+
+
+def _heartbeat_payload(details: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    payload = HeartbeatResponse(
+        container_id=_build_metadata.container_id,
+        build_id=_build_metadata.build_id,
+        git_sha=_build_metadata.git_sha,
+        runtime=_build_metadata.runtime,
+        host=_APP_HOST,
+        port=_APP_PORT,
+        uptime_seconds=round(time.monotonic() - _started_at_monotonic, 3),
+        timestamp_utc=datetime.now(timezone.utc),
+        details=details or {},
+    )
+    return payload.model_dump(mode="json")
+
 
 # ---------------------------------------------------------------------------
 # GET /
 # ---------------------------------------------------------------------------
 @app.get("/")
 async def root() -> Dict[str, Any]:
-    """Root endpoint — heartbeat for OpenEnv platform probes."""
+    """Root endpoint — simple success response for Hugging Face Spaces."""
+    log.debug("Root endpoint accessed")
     return {
         "status": "ok",
         "name": "missionctrl",
-        "version": "1.0.0",
-        "endpoints": ["/health", "/reset", "/step", "/state", "/dashboard", "/history"],
+        "endpoints": ["/health", "/reset", "/step", "/state", "/dashboard", "/history", "/web", "/ports"],
+        "heartbeat": _heartbeat_payload(),
+        "log_summary": {"entries": len(_request_logs), "errors": sum(1 for e in _request_logs if e.status_code >= 400)},
+        "uptime_seconds": round(time.monotonic() - _started_at_monotonic, 3),
     }
 
 
@@ -138,7 +207,32 @@ async def root() -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 @app.get("/health")
 async def health() -> Dict[str, Any]:
-    return {"healthy": True, "env": "missionctrl"}
+    """Simple health check for Hugging Face Spaces - returns instantly."""
+    log.debug("Health check accessed")
+    return {
+        "healthy": True,
+        **_heartbeat_payload(),
+    }
+
+
+@app.get("/web")
+async def web_info() -> Dict[str, Any]:
+    return {
+        **_heartbeat_payload({
+            "dashboard": "/dashboard",
+            "logs": "/logs",
+        }),
+    }
+
+
+@app.get("/ports")
+async def ports() -> Dict[str, Any]:
+    return _heartbeat_payload({
+        "role": "port_info",
+        "configured_port": _APP_PORT,
+        "host_binding": _APP_HOST,
+        "known_open_ports": [_APP_PORT],
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +247,7 @@ async def reset(req: Optional[ResetRequest] = None) -> Dict[str, Any]:
         raise HTTPException(status_code=422, detail=f"task_id must be one of {sorted(valid)}")
 
     # Results are now pushed explicitly via POST /result from inference.py
-    result = _env.reset(task_id=req.task_id, seed=req.seed)
+    result = _get_env().reset(task_id=req.task_id, seed=req.seed)
     log.info("Reset → task=%s seed=%s", req.task_id, req.seed)
     return result
 
@@ -163,7 +257,7 @@ async def reset(req: Optional[ResetRequest] = None) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 @app.post("/step")
 async def step(req: StepRequestBody) -> Dict[str, Any]:
-    result = _env.step(req.action)
+    result = _get_env().step(req.action)
     log.info(
         "Step %d | action=%s | reward=%+.2f done=%s",
         result["observation"]["time_step"],
@@ -179,8 +273,35 @@ async def step(req: StepRequestBody) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 @app.get("/state")
 async def state() -> Dict[str, Any]:
-    """Return current observation snapshot for dashboard."""
-    return _env.engine.get_state()
+    """Return current observation snapshot with runtime metadata."""
+    observation = _get_env().engine.get_state()
+    return {
+        **_heartbeat_payload({"role": "state"}),
+        "build": _build_metadata.model_dump(mode="json"),
+        **observation,
+    }
+
+
+# ---------------------------------------------------------------------------
+# GET /logs
+# ---------------------------------------------------------------------------
+@app.get("/logs")
+async def logs() -> LogsSummaryResponse:
+    entries = list(_request_logs)
+    status_counter = Counter(str(entry.status_code) for entry in entries)
+    path_counter = Counter(entry.path for entry in entries)
+    totals = {
+        "entries": len(entries),
+        "unique_paths": len(path_counter),
+        "errors": sum(1 for e in entries if e.status_code >= 400),
+    }
+    return LogsSummaryResponse(
+        build=_build_metadata,
+        totals=totals,
+        statuses=dict(status_counter),
+        paths=dict(path_counter),
+        entries=entries[-50:],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -188,7 +309,7 @@ async def state() -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 @app.get("/history")
 async def history() -> List[Dict[str, Any]]:
-    return list(_env.action_history)
+    return list(_get_env().action_history)
 
 
 # ---------------------------------------------------------------------------
@@ -226,6 +347,15 @@ async def dashboard() -> HTMLResponse:
     html_path = os.path.join(os.path.dirname(__file__), "dashboard.html")
     with open(html_path, "r") as f:
         return HTMLResponse(content=f.read())
+
+
+@app.get("/dashboard/ping")
+async def dashboard_ping() -> Dict[str, Any]:
+    return _heartbeat_payload({
+        "role": "dashboard_ping",
+        "dashboard_path": "/dashboard",
+        "ready": True,
+    })
 
 
 # ---------------------------------------------------------------------------

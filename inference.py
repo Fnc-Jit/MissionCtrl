@@ -46,7 +46,7 @@ API_BASE_URL: str = os.environ.get("API_BASE_URL", "https://router.huggingface.c
 MODEL_NAME: str   = os.environ.get("MODEL_NAME", "openai/gpt-oss-120b")
 HF_TOKEN: str     = os.environ.get("HF_TOKEN", "")
 
-ENV_BASE_URL: str = os.environ.get("ENV_BASE_URL", "http://localhost:8000")
+ENV_BASE_URL: str = os.environ.get("ENV_BASE_URL", "http://localhost:7860")
 
 MAX_STEPS: int = int(os.environ.get("MAX_STEPS", "5"))
 TASKS: List[str] = ["easy", "medium", "hard", "special"]
@@ -98,7 +98,6 @@ _retry_logger = _logging.getLogger("missionctrl.retry")
 
 class PromptTooLargeError(RuntimeError):
     """Raised when provider rejects a request as permanently oversized."""
-
 
 
 def _append_bounded_unique(bucket: List[str], value: str, limit: int) -> None:
