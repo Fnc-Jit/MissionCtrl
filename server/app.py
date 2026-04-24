@@ -192,7 +192,14 @@ def _heartbeat_payload(details: Optional[Dict[str, Any]] = None) -> Dict[str, An
 async def root() -> Dict[str, Any]:
     """Root endpoint — simple success response for Hugging Face Spaces."""
     log.debug("Root endpoint accessed")
-    return {"status": "ok", "name": "missionctrl"}
+    return {
+        "status": "ok",
+        "name": "missionctrl",
+        "endpoints": ["/health", "/reset", "/step", "/state", "/dashboard", "/history", "/web", "/ports"],
+        "heartbeat": _heartbeat_payload(),
+        "log_summary": {"entries": len(_request_logs), "errors": sum(1 for e in _request_logs if e.status_code >= 400)},
+        "uptime_seconds": round(time.monotonic() - _started_at_monotonic, 3),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -202,17 +209,19 @@ async def root() -> Dict[str, Any]:
 async def health() -> Dict[str, Any]:
     """Simple health check for Hugging Face Spaces - returns instantly."""
     log.debug("Health check accessed")
-    return {"status": "ok"}
+    return {
+        "healthy": True,
+        **_heartbeat_payload(),
+    }
 
 
 @app.get("/web")
 async def web_info() -> Dict[str, Any]:
     return {
-        "service": "MissionCtrl",
-        "version": "1.0.0",
-        "status": "running",
-        "dashboard": "/dashboard",
-        "logs": "/logs",
+        **_heartbeat_payload({
+            "dashboard": "/dashboard",
+            "logs": "/logs",
+        }),
     }
 
 
