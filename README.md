@@ -389,6 +389,7 @@ Training on Kaggle can be done **only in the browser** or with the **official [K
 #### Troubleshooting
 
 - **`Directory 'MissionCtrl' exists but is incomplete`:** The clone + verify cell found a `MissionCtrl` folder that is missing one or more of the required modules (`train.py`, `grpo_rewards.py`, `grpo_completion.py`, etc.). Delete that folder in the Kaggle file browser (or run `!rm -rf MissionCtrl` after `%cd /kaggle/working`), then re-run the cell; or set `MISSIONCTRL_REPO_URL` to a full repository; or use **Add data** with a dataset that contains a complete checkout.
+- **`No module named 'environment'`** (or other local modules) after clone: Jupyter does not put the post-clone working directory on `sys.path` by default. Re-run the **clone + verify** cell (it prepends the repo root to `sys.path`); if you use an older notebook, run the latest version from the repo or add the same `sys.path` step from that cell.
 
 #### Option A: Kaggle.com only (import the notebook, run training)
 
