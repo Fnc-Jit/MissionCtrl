@@ -63,6 +63,19 @@ import random
 import re
 import logging
 import torch
+# Pre-bind torch submodules that some torch/unsloth_zoo builds (e.g. Kaggle's
+# torch 2.10.0+cu128) do not auto-load. Without these imports, importing
+# `unsloth` triggers `unsloth_zoo.temporary_patches.common` -> `torch._inductor`
+# -> `torch._dynamo.variables.torch`, whose module-level code references
+# `torch._utils._get_device_index` and fails with AttributeError.
+try:
+    import torch._utils  # noqa: F401
+except Exception:
+    pass
+try:
+    import torch._C  # noqa: F401
+except Exception:
+    pass
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
