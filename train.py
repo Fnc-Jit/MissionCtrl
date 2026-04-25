@@ -62,6 +62,7 @@ import json
 import random
 import re
 import logging
+import inspect
 import torch
 # Pre-bind torch submodules that some torch/unsloth_zoo builds (e.g. Kaggle's
 # torch 2.10.0+cu128) do not auto-load. Without these imports, importing
@@ -88,6 +89,7 @@ from unsloth import FastLanguageModel
 from trl import GRPOConfig, GRPOTrainer
 from datasets import Dataset
 from transformers import TrainerCallback
+from transformers import GenerationConfig
 
 # Local env
 sys.path.insert(0, os.path.dirname(__file__))
@@ -128,8 +130,9 @@ MODEL_NAME      = os.environ.get(
 )
 MAX_SEQ_LEN     = 4096
 # Aligned with GRPOConfig.max_completion_length, evaluate() max_new_tokens, and FIX #22 prompt cap.
+# Default 64 for wall time; override: MISSIONCTRL_COMPLETION_MAX_TOKENS=96 or 128 if truncations.
 COMPLETION_MAX_TOKENS = int(
-    os.environ.get("MISSIONCTRL_COMPLETION_MAX_TOKENS", "128").strip() or "128"
+    os.environ.get("MISSIONCTRL_COMPLETION_MAX_TOKENS", "64").strip() or "64"
 )
 # Council: start at 16; try 32 if a baseline run plateaus. Override: MISSIONCTRL_LORA_RANK
 LORA_RANK       = int(os.environ.get("MISSIONCTRL_LORA_RANK", "16"))
@@ -372,6 +375,80 @@ def _device_map_for_load() -> str | None:
     return DEVICE_MAP
 
 
+def _sanitize_model_generation_config(model, tokenizer) -> None:
+    """
+    Clear inherited `max_length` (often 131072 on hub) so TRL/GRPO's `max_new_tokens`
+    does not trigger "Both max_new_tokens and max_length seem to have been set."
+    After LoRA, touch wrapper and PEFT `base_model` if they carry their own `generation_config`.
+    """
+    eos = getattr(tokenizer, "eos_token_id", None)
+    pad = getattr(tokenizer, "pad_token_id", None)
+    candidates: list[object] = [model]
+    for attr in ("base_model", "model"):
+        b = getattr(model, attr, None)
+        if b is not None and b not in candidates:
+            candidates.append(b)
+    bb = getattr(model, "base_model", None)
+    if bb is not None:
+        for attr in ("model",):
+            inner = getattr(bb, attr, None)
+            if inner is not None and inner not in candidates:
+                candidates.append(inner)
+
+    for m in candidates:
+        g = getattr(m, "generation_config", None)
+        if g is None:
+            continue
+        try:
+            gdict = g.to_dict()
+        except Exception:
+            try:
+                g.max_length = None
+            except Exception:
+                pass
+            continue
+        gdict["max_length"] = None
+        gdict["min_length"] = 0
+        if pad is not None:
+            gdict["pad_token_id"] = pad
+        if eos is not None:
+            gdict["eos_token_id"] = eos
+        # Let TRL supply max_new_tokens at call time; avoid stale new_tokens on config.
+        if "max_new_tokens" in gdict:
+            gdict["max_new_tokens"] = None
+        try:
+            if hasattr(GenerationConfig, "from_dict"):
+                m.generation_config = GenerationConfig.from_dict(gdict)
+            else:  # pragma: no cover
+                m.generation_config = GenerationConfig(**gdict)
+        except Exception as e:
+            logger.debug("Could not rebuild generation_config: %s", e)
+            try:
+                m.generation_config.max_length = None
+            except Exception:
+                pass
+
+
+def _grpo_config_generation_extras_if_supported(tokenizer) -> dict:
+    """
+    If this TRL version supports it, pass a minimal GenerationConfig (no max_length) so
+    `generate` does not merge hub defaults with max_new_tokens. Omitted on older TRL.
+    """
+    try:
+        if "generation_config" not in inspect.signature(GRPOConfig.__init__).parameters:
+            return {}
+    except (TypeError, OSError, ValueError):
+        return {}
+    return {
+        "generation_config": GenerationConfig(
+            max_length    = None,
+            pad_token_id  = getattr(tokenizer, "pad_token_id", None),
+            bos_token_id  = getattr(tokenizer, "bos_token_id", None),
+            eos_token_id  = getattr(tokenizer, "eos_token_id", None),
+        )
+    }
+
+
 def load_model():
     """Load base model with Unsloth optimizations and LoRA adapters."""
     load_kwargs = dict(
@@ -402,6 +479,8 @@ def load_model():
     # FIX #11: set padding_side to "left" for correct batched generation with GRPO
     tokenizer.pad_token   = tokenizer.eos_token
     tokenizer.padding_side = "left"
+
+    _sanitize_model_generation_config(model, tokenizer)
 
     return model, tokenizer
 
@@ -705,7 +784,7 @@ def train():
                 log_window=int(os.environ.get("MISSIONCTRL_EARLY_STOP_LOG_WINDOW", "3")),
             )
 
-            grpo_config = GRPOConfig(
+            _grpo_kwargs = dict(
                 output_dir                  = f"{OUTPUT_DIR}/phase_{phase_idx + 1}_attempt_{phase_attempts}",
                 num_train_epochs            = 1,
                 max_steps                   = phase["steps"],
@@ -721,6 +800,15 @@ def train():
                 report_to                   = _DEFAULT_REPORT,
                 seed                        = 42,
             )
+            if os.environ.get("MISSIONCTRL_SKIP_GRPO_GENERATION_CONFIG", "").strip().lower() not in (
+                "1", "true", "yes",
+            ):
+                _grpo_kwargs.update(_grpo_config_generation_extras_if_supported(tokenizer))
+            try:
+                grpo_config = GRPOConfig(**_grpo_kwargs)
+            except TypeError:
+                _grpo_kwargs.pop("generation_config", None)
+                grpo_config = GRPOConfig(**_grpo_kwargs)
 
             trainer = GRPOTrainer(
                 model        = model,
