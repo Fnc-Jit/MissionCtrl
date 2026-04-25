@@ -14,6 +14,15 @@ Method : GRPO (Group Relative Policy Optimization) via TRL
 Expected training time on A100: ~2-3 hours for visible reward improvement
 Expected reward curve: 0.28 → 0.75+ after 500 steps
 
+Default curriculum total: 500 GRPO max_steps (150+200+150) on a single GPU,
+plus per-phase eval; allow extra time if a phase repeats (see MAX_PHASE_REPEATS).
+T4 (low VRAM): same step counts unless you set MISSIONCTRL_SMOKE_STEPS or
+MISSIONCTRL_T4_CURRICULUM — expect wall time much longer than A100 (often hours more).
+
+Pre-flight: run `python train.py --reward-smoke` (no model), `python train.py
+--baseline-only` (no GRPO), then optional `python train.py --smoke-train` on GPU
+(2-step GRPO; skips Hub push). Unit tests: `pytest tests/test_train_grpo.py`.
+
 Reward ceiling: 0.85 (not 1.0). A score of 0.75+ represents ~88% of maximum.
 See reward_model.py for signal breakdown.
 
@@ -26,6 +35,11 @@ on the score. See README for evaluation spec details.
 # ── Imports ───────────────────────────────────────────────────────────────────
 import os
 import sys
+# `python train.py --reward-smoke` must not import torch/unsloth (no GPU stub in minimal CI)
+if __name__ == "__main__" and len(sys.argv) == 2 and sys.argv[1] == "--reward-smoke":
+    from grpo_rewards import run_reward_smoke
+    raise SystemExit(0 if run_reward_smoke() else 1)
+
 import json
 import random
 import re
@@ -46,6 +60,7 @@ from transformers import TrainerCallback
 
 # Local env
 sys.path.insert(0, os.path.dirname(__file__))
+from grpo_rewards import EPISODE_MAX_STEPS, grpo_reward_fn
 from environment import MissionCtrlEnv, OverseerAction, parse_action
 from reward_model import compute_reward, reward_breakdown
 
@@ -136,8 +151,19 @@ except Exception:
     ]
 MAX_PHASE_REPEATS = 2   # repeat a phase up to this many times if threshold not met
 
-# FIX #39: consistent max_steps across training and evaluation
-EPISODE_MAX_STEPS = 40  # matches MissionCtrlEnv default
+# Shorter curriculum for single low-VRAM GPU (e.g. Colab T4) — same idea as 2×GPU Kaggle table
+if os.environ.get("MISSIONCTRL_T4_CURRICULUM", "").strip().lower() in ("1", "true", "yes"):
+    try:
+        if not (torch.cuda.is_available() and torch.cuda.device_count() >= 2):
+            CURRICULUM = [
+                {"difficulty": "easy",   "num_tasks": 3, "steps": 100, "min_reward": 0.50, "target": 0.55},
+                {"difficulty": "medium", "num_tasks": 3, "steps": 150, "min_reward": 0.55, "target": 0.62},
+                {"difficulty": "hard",   "num_tasks": 4, "steps": 100, "min_reward": 0.65, "target": 0.72},
+            ]
+    except Exception:
+        pass
+
+# EPISODE_MAX_STEPS: imported from grpo_rewards (single source; matches MissionCtrlEnv default)
 
 # ── System Prompt ─────────────────────────────────────────────────────────────
 
@@ -257,125 +283,25 @@ def generate_training_samples(
 
 # ── Reward Function for GRPO ──────────────────────────────────────────────────
 
-def grpo_reward_fn(completions: list[str], prompts: list, **kwargs) -> list[float]:
+def _effective_curriculum() -> list[dict]:
     """
-    GRPO reward function called by TRL.
-
-    FIX #1: Now runs a FULL episode rollout (not just one step).
-    The first action comes from the model completion; subsequent actions use a
-    greedy policy (approve-all) to complete the episode. This gives a meaningful
-    multi-step reward signal rather than a single-step snapshot. (A fuller
-    multi-step model rollout in the reward would reduce greedy-completion bias
-    but requires a larger TRL integration change.)
-
-    FIX #3: Returns the FINAL reward (single composite score at episode end),
-    not a sum of per-step rewards. compute_reward returns a state score [0,1],
-    and summing state scores across steps is meaningless.
-
-    FIX #20: Exceptions are now logged (not silently swallowed).
+    Full CURRICULUM, or a single short easy phase when MISSIONCTRL_SMOKE_STEPS is set
+    (GPU dry run: few GRPO steps, no Hub push in train()).
     """
-    rewards = []
-
-    for i, completion in enumerate(completions):
-        try:
-            # Extract seed from embedded tag in prompt
-            prompt_text = ""
-            if i < len(prompts):
-                p = prompts[i]
-                if isinstance(p, list):
-                    prompt_text = " ".join(
-                        msg.get("content", "") if isinstance(msg, dict) else str(msg)
-                        for msg in p
-                    )
-                else:
-                    prompt_text = str(p)
-
-            seed_match = re.search(
-                r"<!-- seed:(\d+):difficulty:(\w+):num_tasks:(\d+) -->",
-                prompt_text
-            )
-
-            if seed_match:
-                episode_seed = int(seed_match.group(1))
-                difficulty   = seed_match.group(2)
-                num_tasks    = int(seed_match.group(3))
-            else:
-                # Fallback defaults if tag not found
-                logger.warning(f"Seed tag not found in prompt {i}, using defaults")
-                episode_seed = i
-                difficulty   = "medium"
-                num_tasks    = 3
-
-            # Reconstruct env deterministically from seed
-            env = MissionCtrlEnv(
-                difficulty = difficulty,
-                num_tasks  = num_tasks,
-                seed       = episode_seed,
-                max_steps  = EPISODE_MAX_STEPS,  # FIX #39
-            )
-            env.reset(seed=episode_seed)
-
-            # FIX #1: Apply model's action for this step, then run episode to completion
-            # using a greedy policy (approve first available in-progress task)
-            action = parse_action(completion)
-            _, _, terminated, truncated, _ = env.step(action)
-
-            # Complete the episode with simple greedy policy
-            from environment import TaskStatus
-            step_count = 1
-            while not (terminated or truncated) and step_count < EPISODE_MAX_STEPS:
-                # Simple completion policy: FLAG any remaining injected tasks,
-                # then APPROVE clean in-progress tasks
-                greedy_action = _greedy_completion_action(env)
-                _, _, terminated, truncated, _ = env.step(greedy_action)
-                step_count += 1
-
-            # FIX #3: Use FINAL reward (state score at episode end), not a sum
-            final_reward = compute_reward(env)
-            rewards.append(float(final_reward))
-
-        except Exception as e:
-            # FIX #20: log the exception so bugs are visible during training
-            logger.warning(f"Reward fn error for completion {i}: {e}")
-            rewards.append(0.0)
-
-    return rewards
-
-
-def _greedy_completion_action(env: "MissionCtrlEnv") -> OverseerAction:
-    """
-    Simple completion policy used to finish episodes after the model's first action.
-    Priority: FLAG uncaught hallucinations → APPROVE clean in-progress tasks → SYNTHESIZE.
-    """
-    from environment import TaskStatus
-
-    # First: flag any uncaught injected hallucinations
-    uncaught = env._injected_ids - env._caught_ids
-    for task_id in uncaught:
-        task = env._get_task(task_id)
-        if task and task.status == TaskStatus.IN_PROGRESS:
-            return OverseerAction(
-                "FLAG",
-                task_id  = task_id,
-                evidence = f"hallucination detected: {task.hallucination_type}"
-            )
-
-    # Second: approve clean in-progress tasks
-    for task in env._tasks:
-        if task.status == TaskStatus.IN_PROGRESS and task.task_id not in env._injected_ids:
-            return OverseerAction("APPROVE", task_id=task.task_id)
-
-    # Third: synthesize if all hallucinations are caught
-    uncaught = env._injected_ids - env._caught_ids
-    if not uncaught:
-        return OverseerAction("SYNTHESIZE")
-
-    # Fallback: approve the first in-progress task
-    for task in env._tasks:
-        if task.status == TaskStatus.IN_PROGRESS:
-            return OverseerAction("APPROVE", task_id=task.task_id)
-
-    return OverseerAction("NOOP")
+    raw = os.environ.get("MISSIONCTRL_SMOKE_STEPS", "").strip()
+    if not raw:
+        return CURRICULUM
+    try:
+        n = max(1, int(raw))
+    except ValueError:
+        n = 2
+    return [{
+        "difficulty":  "easy",
+        "num_tasks":   3,
+        "steps":       n,
+        "min_reward":  0.0,   # always pass gate in smoke; goal is to exercise the loop
+        "target":      0.0,
+    }]
 
 
 # ── Model Setup ───────────────────────────────────────────────────────────────
@@ -662,13 +588,20 @@ class FlatRewardEarlyStopCallback(TrainerCallback):
 # ── Training Loop with Curriculum Gating ─────────────────────────────────────
 
 def train():
+    is_smoke = bool(os.environ.get("MISSIONCTRL_SMOKE_STEPS", "").strip())
+    if is_smoke:
+        print(
+            f"🔬 MISSIONCTRL_SMOKE_STEPS={os.environ.get('MISSIONCTRL_SMOKE_STEPS', '').strip()}: "
+            "single easy phase; push_to_hub disabled at end."
+        )
     print("🚀 Loading model...")
     model, tokenizer = load_model()
     # tokenizer.pad_token and padding_side already set in load_model()
 
     all_rewards_history = []
+    curriculum = _effective_curriculum()
 
-    for phase_idx, phase in enumerate(CURRICULUM):
+    for phase_idx, phase in enumerate(curriculum):
         phase_attempts = 0
         phase_passed   = False
 
@@ -678,7 +611,7 @@ def train():
 
             print(f"\n{'=' * 60}")
             print(
-                f"📚 Curriculum Phase {phase_idx + 1}/3: {phase['difficulty'].upper()} "
+                f"📚 Curriculum Phase {phase_idx + 1}/{len(curriculum)}: {phase['difficulty'].upper()} "
                 f"| {phase['num_tasks']} tasks | {phase['steps']} steps {attempt_label}"
             )
             print(f"{'=' * 60}")
@@ -786,12 +719,15 @@ def train():
         )
 
     # FIX #28: push LoRA adapter to Hub; local save also uses lora for consistency
-    print(f"\n📤 Pushing to HuggingFace Hub: {HF_REPO}")
     os.makedirs(f"{OUTPUT_DIR}/final_lora", exist_ok=True)
     model.save_pretrained(f"{OUTPUT_DIR}/final_lora")
     tokenizer.save_pretrained(f"{OUTPUT_DIR}/final_lora")
-    model.push_to_hub(HF_REPO, tokenizer=tokenizer)
-    print(f"  ✅ LoRA adapter uploaded → https://huggingface.co/{HF_REPO}")
+    if is_smoke:
+        print(f"  ℹ️  Smoke run: skipped push_to_hub (local adapter: {OUTPUT_DIR}/final_lora)")
+    else:
+        print(f"\n📤 Pushing to HuggingFace Hub: {HF_REPO}")
+        model.push_to_hub(HF_REPO, tokenizer=tokenizer)
+        print(f"  ✅ LoRA adapter uploaded → https://huggingface.co/{HF_REPO}")
     print(f"  ℹ️  To use: load base model + adapter via PEFT/Unsloth")
 
     return all_rewards_history
@@ -808,9 +744,21 @@ if __name__ == "__main__":
                         help="Evaluate a saved checkpoint")
     parser.add_argument("--checkpoint", type=str, default=None,
                         help="Path to checkpoint for eval")
+    parser.add_argument("--reward-smoke", action="store_true",
+                        help="Run grpo_reward_fn on TRL-style completions (no model load)")
+    parser.add_argument("--smoke-train", action="store_true",
+                        help="Run one easy phase; uses MISSIONCTRL_SMOKE_STEPS (default 2); no Hub push")
     args = parser.parse_args()
 
-    if args.baseline_only:
+    if args.reward_smoke:
+        from grpo_rewards import run_reward_smoke
+        raise SystemExit(0 if run_reward_smoke() else 1)
+    if args.smoke_train:
+        if not os.environ.get("MISSIONCTRL_SMOKE_STEPS", "").strip():
+            os.environ["MISSIONCTRL_SMOKE_STEPS"] = "2"
+        print("🔬 --smoke-train: short GRPO run (no baseline, Hub push disabled)\n")
+        train()
+    elif args.baseline_only:
         run_baseline()
     elif args.eval_only and args.checkpoint:
         model, tokenizer = load_model()
