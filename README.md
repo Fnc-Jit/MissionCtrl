@@ -371,7 +371,7 @@ Set these in Kaggle **Add-ons → Environment** or in a shell **before** running
 | `MISSIONCTRL_EARLY_STOP_LOG_WINDOW` | `3` | Number of recent `logging_steps` log points used to detect a flat reward. |
 | `MISSIONCTRL_SMOKE_STEPS` | (unset) | If set to a positive integer, `train()` runs a single easy phase with that many `max_steps` and skips `push_to_hub` (GPU dry run). |
 | `MISSIONCTRL_T4_CURRICULUM` | (unset) | If `1`/`true`/`yes` on a **single** GPU, uses a shorter 100+150+100 step curriculum. |
-| `MISSIONCTRL_DEVICE_MAP` | `1` | On **2+ GPUs** (`device_map` path), set to `0`/`false`/`off` to skip passing `device_map="balanced"` to Unsloth (useful if a driver or Unsloth build misbehaves; training stays single-GPU in that case). |
+| `MISSIONCTRL_DEVICE_MAP` | (unset) | Keep unset for stable GRPO generation on Kaggle; the model loads on one CUDA device while the 2×T4 curriculum is still shortened. Set to `balanced` only to experiment with model-parallel loading; it can trigger `cuda:0`/`cuda:1` tensor mismatch errors during Unsloth generation. |
 
 ### Kaggle training and Kaggle CLI
 
@@ -435,13 +435,14 @@ flowchart LR
 - [ ] Kaggle **Secret** `HF_TOKEN` attached; gated models accepted on HuggingFace.
 - [ ] `HF_REPO` in `train.py` is your real Hub id (not a placeholder).
 - [ ] Optional: run `python train.py --smoke-train` before a long run; see the **GRPO / LoRA training** table above for `MISSIONCTRL_MODEL_NAME`, `MISSIONCTRL_SMOKE_STEPS`, `MISSIONCTRL_DEVICE_MAP`, etc.
-- [ ] If two CUDA devices are visible, [`train.py`](train.py) uses a shorter curriculum and can use `device_map` model parallelism; `accelerate launch` multi-process DDP is not the default path in this project.
+- [ ] If two CUDA devices are visible, [`train.py`](train.py) uses a shorter curriculum but keeps GRPO generation on one CUDA device by default; `accelerate launch` multi-process DDP is not the default path in this project.
 
 #### API limits and troubleshooting
 
 - `enable_gpu` in metadata does not guarantee a specific **GPU type**; **2 × T4** is chosen in the **Kaggle web UI** when the option is not reflected after `push` ([kernels_metadata.md](https://github.com/Kaggle/kaggle-api/blob/main/docs/kernels_metadata.md) lists supported fields; accelerator-class selection has been a common limitation).
 - 2× T4 GRPO is **slow** compared to a single A100; wall time and session limits still apply.
-- OOM or driver issues: try `MISSIONCTRL_DEVICE_MAP=0` or a lower `MISSIONCTRL_LORA_RANK` (see the table above).
+- Tensor device mismatch (`cuda:0` vs `cuda:1`) during GRPO generation: leave `MISSIONCTRL_DEVICE_MAP` unset so `train.py` does not split the model across T4s.
+- OOM or driver issues: try a lower `MISSIONCTRL_LORA_RANK` (see the table above), or use `MISSIONCTRL_SMOKE_STEPS` before a long run.
 - There is no Kaggle “job runner” in Cursor: training runs in the Kaggle **session** or a kernel you start from the site.
 
 #### Local Kaggle CLI: install and token

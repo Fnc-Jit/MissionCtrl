@@ -11,8 +11,9 @@ Install (Kaggle notebook; adjust `unsloth[...]` per Unsloth if wheels fail):
 Kaggle: enable Internet; add Secret `HF_TOKEN` (gated models need license on HF). Prefer
 `%cd /kaggle/working` and clone the repo; checkpoints go to
 `/kaggle/working/missionctrl_checkpoints` (see `OUTPUT_DIR`). Accelerator: 2× T4.
-With 2+ GPUs, `device_map` defaults to "balanced" for model parallelism; set
-`MISSIONCTRL_DEVICE_MAP=0` to force a single device and rely on the trainer only.
+GRPO generation is most stable with the model on one CUDA device; set
+`MISSIONCTRL_DEVICE_MAP=balanced` only if you explicitly want to experiment with
+model-parallel loading.
 `accelerate launch` / multi-process DDP is not required for the default path; GRPO+Unsloth
 here is single-process. See README "Kaggle (2×T4 training)".
 
@@ -132,8 +133,10 @@ assert not any(
 # Platform-specific configs
 try:
     if torch.cuda.is_available() and torch.cuda.device_count() >= 2:
-        # Kaggle T4 x2
-        DEVICE_MAP = "balanced"
+        # Kaggle T4 x2. Keep model on one CUDA device by default: Unsloth/TRL
+        # GRPO calls generate() during training, and generation can crash when
+        # a device_map splits tensors across cuda:0/cuda:1.
+        DEVICE_MAP = None
         BATCH_SIZE = 2
         NUM_GENERATIONS = 2  # FIX #2: must be ≤ BATCH_SIZE
         GRAD_ACCUM = 8
@@ -331,12 +334,14 @@ def _effective_curriculum() -> list[dict]:
 # ── Model Setup ───────────────────────────────────────────────────────────────
 
 def _device_map_for_load() -> str | None:
-    """2+ GPU: spread weights with 'balanced' unless disabled via MISSIONCTRL_DEVICE_MAP."""
-    if DEVICE_MAP is None:
-        return None
-    raw = os.environ.get("MISSIONCTRL_DEVICE_MAP", "1").strip().lower()
+    """Optional model-parallel loading; disabled by default for GRPO generation stability."""
+    raw = os.environ.get("MISSIONCTRL_DEVICE_MAP", "").strip().lower()
     if raw in ("0", "false", "off", "no"):
         return None
+    if raw in ("1", "true", "yes", "balanced"):
+        return "balanced"
+    if raw in ("auto", "sequential"):
+        return raw
     return DEVICE_MAP
 
 
