@@ -344,9 +344,18 @@ async def record_result(req: ResultRequest) -> Dict[str, str]:
 # ---------------------------------------------------------------------------
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard() -> HTMLResponse:
-    html_path = os.path.join(os.path.dirname(__file__), "dashboard.html")
-    with open(html_path, "r") as f:
-        return HTMLResponse(content=f.read())
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    candidates = [
+        os.path.join(repo_root, "redesigned-dashboard.html"),
+        os.path.join(os.path.dirname(__file__), "dashboard.html"),
+    ]
+
+    for html_path in candidates:
+        if os.path.exists(html_path):
+            with open(html_path, "r", encoding="utf-8") as f:
+                return HTMLResponse(content=f.read())
+
+    raise HTTPException(status_code=500, detail="Dashboard HTML file not found")
 
 
 @app.get("/dashboard/ping")

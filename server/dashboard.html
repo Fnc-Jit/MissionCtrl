@@ -6,231 +6,1029 @@
 <title>MissionCtrl — AI Oversight Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-:root{
-  --bg:#0a0e1a;--card:#111827;--card-border:#1f2937;
-  --text:#e5e7eb;--text-dim:#9ca3af;--text-bright:#f9fafb;
-  --accent:#6366f1;--accent2:#8b5cf6;
-  --green:#10b981;--amber:#f59e0b;--red:#ef4444;--blue:#3b82f6;
-  --tp-green:#059669;--fp-red:#dc2626;
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0f1117;
+  --bg-secondary: #161b22;
+  --card: #0d1117;
+  --card-border: #30363d;
+  --text: #e6edf3;
+  --text-dim: #8b949e;
+  --text-bright: #f0f6fc;
+  --accent: #58a6ff;
+  --accent-alt: #79c0ff;
+  --success: #3fb950;
+  --warning: #d29922;
+  --danger: #f85149;
+  --info: #1f6feb;
+  --nav-height: 64px;
+  --subnav-height: 48px;
 }
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-.container{max-width:1400px;margin:0 auto;padding:20px}
 
-/* Header */
-.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding:16px 24px;
-  background:linear-gradient(135deg,rgba(99,102,241,.12),rgba(139,92,246,.08));
-  border:1px solid var(--card-border);border-radius:16px;backdrop-filter:blur(12px)}
-.header h1{font-size:1.5rem;font-weight:800;letter-spacing:-0.02em;
-  background:linear-gradient(135deg,#818cf8,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.header .subtitle{font-size:.85rem;color:var(--text-dim);margin-top:2px}
-.header-right{display:flex;gap:12px;align-items:center}
-.badge{padding:6px 14px;border-radius:99px;font-size:.75rem;font-weight:600;letter-spacing:.03em}
-.badge-task{background:rgba(99,102,241,.15);color:#818cf8;border:1px solid rgba(99,102,241,.3)}
-.badge-step{background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.3)}
-.badge-done{background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.3)}
-.badge-health{background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.3)}
-.badge-health.offline{background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.3)}
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
 
-/* KPI Strip */
-.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
-.kpi-card{background:var(--card);border:1px solid var(--card-border);border-radius:12px;padding:16px 20px}
-.kpi-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);margin-bottom:6px}
-.kpi-value{font-size:1.8rem;font-weight:700;letter-spacing:-0.02em}
-.kpi-value.good{color:var(--green)}.kpi-value.warn{color:var(--amber)}.kpi-value.bad{color:var(--red)}
+/* ──────────────────────────────────────────────────────────────────────────── */
+/* TOP NAVIGATION */
+/* ──────────────────────────────────────────────────────────────────────────── */
 
-/* Grid */
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
-.card{background:var(--card);border:1px solid var(--card-border);border-radius:12px;padding:20px;overflow:hidden}
-.card-title{font-size:.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin-bottom:12px;
-  display:flex;align-items:center;gap:8px}
-.card-title span{font-size:1rem}
+.top-nav {
+  height: var(--nav-height);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--card-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
 
-/* Task Table */
-table{width:100%;border-collapse:collapse;font-size:.8rem}
-th{text-align:left;padding:8px 10px;color:var(--text-dim);border-bottom:1px solid var(--card-border);font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em}
-td{padding:8px 10px;border-bottom:1px solid rgba(31,41,55,.5)}
-tr:hover td{background:rgba(99,102,241,.04)}
-.status{display:inline-block;padding:2px 8px;border-radius:6px;font-size:.7rem;font-weight:600}
-.status-DONE{background:rgba(16,185,129,.15);color:#34d399}
-.status-IN_PROGRESS{background:rgba(59,130,246,.15);color:#60a5fa}
-.status-PENDING{background:rgba(156,163,175,.15);color:#9ca3af}
-.status-BLOCKED{background:rgba(239,68,68,.15);color:#f87171}
-.status-FAILED{background:rgba(239,68,68,.2);color:#ef4444}
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+}
 
-/* Timeline */
-.timeline{max-height:300px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--card-border) transparent}
-.timeline-entry{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid rgba(31,41,55,.3);font-size:.8rem;align-items:center}
-.timeline-step{min-width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;
-  font-weight:700;font-size:.75rem;background:rgba(99,102,241,.12);color:#818cf8}
-.timeline-action{flex:1;font-family:'Inter',monospace;color:var(--text)}
-.timeline-reward{font-weight:700;min-width:60px;text-align:right}
-.timeline-reward.positive{color:var(--green)}.timeline-reward.negative{color:var(--red)}
-.timeline-indicator{width:8px;height:8px;border-radius:50%}
-.timeline-indicator.tp{background:var(--tp-green)}.timeline-indicator.fp{background:var(--fp-red)}
+.logo h2 {
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-bright);
+}
 
-/* Score Panel */
-.score-final{text-align:center;padding:16px 0}
-.score-final .score{font-size:3rem;font-weight:800;
-  background:linear-gradient(135deg,#818cf8,#34d399);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.score-bar{display:flex;align-items:center;gap:8px;margin:6px 0}
-.score-bar-label{font-size:.75rem;color:var(--text-dim);min-width:140px}
-.score-bar-track{flex:1;height:8px;background:rgba(31,41,55,.8);border-radius:4px;overflow:hidden}
-.score-bar-fill{height:100%;border-radius:4px;transition:width .6s ease}
-.score-bar-value{font-size:.75rem;font-weight:600;min-width:50px;text-align:right}
+.nav-links {
+  display: flex;
+  gap: 8px;
+}
 
-/* Full width card */
-.full-width{grid-column:1/-1}
+.nav-link {
+  padding: 8px 16px;
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
 
-/* Controls */
-.controls{display:flex;gap:8px;margin-bottom:16px}
-.btn{padding:8px 16px;border-radius:8px;border:1px solid var(--card-border);background:var(--card);color:var(--text);
-  cursor:pointer;font-size:.8rem;font-weight:500;transition:all .2s}
-.btn:hover{border-color:var(--accent);background:rgba(99,102,241,.08)}
-.btn-primary{background:var(--accent);border-color:var(--accent);color:white}
-.btn-primary:hover{background:var(--accent2)}
-select{padding:8px 12px;border-radius:8px;border:1px solid var(--card-border);background:var(--card);color:var(--text);font-size:.8rem}
+.nav-link:hover {
+  color: var(--text);
+  background: rgba(88, 166, 255, 0.08);
+}
 
-/* Empty */
-.empty{text-align:center;color:var(--text-dim);padding:40px;font-size:.85rem}
+.nav-link.active {
+  color: var(--accent);
+  background: rgba(88, 166, 255, 0.12);
+}
 
-/* Animations */
-@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
-.animate-in{animation:fadeIn .3s ease}
+.nav-right {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
 
-/* Incident */
-.incident{padding:8px 12px;margin:4px 0;border-radius:8px;font-size:.8rem;border-left:3px solid}
-.incident-miss{background:rgba(239,68,68,.08);border-color:var(--red);color:#fca5a5}
-.incident-fp{background:rgba(245,158,11,.08);border-color:var(--amber);color:#fcd34d}
+/* ──────────────────────────────────────────────────────────────────────────── */
+/* STATUS BAR (SUB-NAV) */
+/* ──────────────────────────────────────────────────────────────────────────── */
 
-/* Run Results */
-.run-results{display:flex;flex-direction:column;gap:10px}
-.result-chip{background:rgba(99,102,241,.06);border:1px solid var(--card-border);
-  border-radius:10px;overflow:hidden;transition:border-color .2s}
-.result-chip:hover{border-color:var(--accent)}
-.result-header{display:flex;align-items:center;gap:14px;padding:14px 16px;cursor:pointer;user-select:none}
-.result-header .result-num{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;
-  font-size:.75rem;font-weight:700;background:rgba(99,102,241,.15);color:#818cf8;flex-shrink:0}
-.result-header .tier{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);min-width:60px}
-.result-header .chip-score{font-size:1.3rem;font-weight:800;letter-spacing:-0.02em;flex-shrink:0}
-.result-header .chip-meta{font-size:.72rem;color:var(--text-dim);flex:1}
-.result-header .chip-bar{width:100px;height:5px;background:rgba(31,41,55,.8);border-radius:3px;overflow:hidden;flex-shrink:0}
-.result-header .chip-bar-fill{height:100%;border-radius:3px;transition:width .5s ease}
-.result-header .expand-icon{font-size:.8rem;color:var(--text-dim);transition:transform .25s;flex-shrink:0}
-.result-chip.open .expand-icon{transform:rotate(180deg)}
-/* Dropdown */
-.result-details{max-height:0;overflow:hidden;transition:max-height .35s ease}
-.result-chip.open .result-details{max-height:600px}
-.result-details-inner{padding:0 16px 16px;border-top:1px solid var(--card-border)}
-.detail-section{margin-top:10px}
-.detail-section-title{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);margin-bottom:6px}
-.detail-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:.78rem}
-.detail-row .dl{color:var(--text-dim)}
-.detail-row .dv{font-weight:600}
-.detail-bar{display:flex;align-items:center;gap:6px;margin:3px 0}
-.detail-bar-label{font-size:.72rem;color:var(--text-dim);min-width:120px;text-transform:capitalize}
-.detail-bar-track{flex:1;height:6px;background:rgba(31,41,55,.8);border-radius:3px;overflow:hidden}
-.detail-bar-fill{height:100%;border-radius:3px}
-.detail-bar-val{font-size:.72rem;font-weight:600;min-width:44px;text-align:right}
-.detail-actions{max-height:120px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--card-border) transparent}
-.detail-action-row{display:flex;gap:8px;align-items:center;padding:3px 0;font-size:.75rem;border-bottom:1px solid rgba(31,41,55,.2)}
-.detail-action-step{width:22px;text-align:center;color:var(--text-dim);font-weight:600}
-.detail-action-text{flex:1;font-family:'Inter',monospace;color:var(--text)}
-.detail-action-rwd{font-weight:700;min-width:40px;text-align:right}
-.detail-action-rwd.pos{color:var(--green)}.detail-action-rwd.neg{color:var(--red)}
-.run-avg{text-align:center;padding:10px 0;margin-top:8px;font-size:.85rem;color:var(--text-dim);
-  border-top:1px solid var(--card-border)}
-.run-avg strong{font-size:1.2rem;font-weight:700;color:var(--text-bright)}
+.status-bar {
+  height: var(--subnav-height);
+  background: var(--bg);
+  border-bottom: 1px solid var(--card-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  position: sticky;
+  top: var(--nav-height);
+  z-index: 90;
+}
+
+.status-left {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.status-badges {
+  display: flex;
+  gap: 12px;
+}
+
+.badge {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--card-border);
+  text-transform: uppercase;
+}
+
+.badge-task { background: rgba(88, 166, 255, 0.08); color: var(--accent); }
+.badge-step { background: rgba(63, 185, 80, 0.08); color: var(--success); }
+.badge-done { background: rgba(248, 81, 73, 0.08); color: var(--danger); }
+.badge-health { background: rgba(63, 185, 80, 0.08); color: var(--success); }
+.badge-health.offline { background: rgba(248, 81, 73, 0.08); color: var(--danger); }
+
+/* ──────────────────────────────────────────────────────────────────────────── */
+/* MAIN CONTENT */
+/* ──────────────────────────────────────────────────────────────────────────── */
+
+.content {
+  flex: 1;
+  padding: 32px;
+  max-width: 1600px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────── */
+/* CONTROLS & BUTTONS */
+/* ──────────────────────────────────────────────────────────────────────────── */
+
+.controls {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 32px;
+  align-items: center;
+}
+
+.controls select {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+  background: var(--card);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.controls select:hover {
+  border-color: var(--accent);
+}
+
+.btn {
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btn:hover {
+  border-color: var(--accent);
+  background: rgba(88, 166, 255, 0.08);
+  color: var(--accent-alt);
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+
+.btn-primary:hover {
+  background: var(--accent-alt);
+  border-color: var(--accent-alt);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────── */
+/* KPI SECTION */
+/* ──────────────────────────────────────────────────────────────────────────── */
+
+.kpi-section {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.kpi-card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 24px;
+  transition: all 0.2s;
+}
+
+.kpi-card:hover {
+  border-color: var(--accent);
+}
+
+.kpi-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+
+.kpi-value {
+  font-size: 2.2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-bright);
+}
+
+.kpi-value.good { color: var(--success); }
+.kpi-value.warn { color: var(--warning); }
+.kpi-value.bad { color: var(--danger); }
+
+/* ──────────────────────────────────────────────────────────────────────────── */
+/* GRID & CARDS */
+/* ──────────────────────────────────────────────────────────────────────────── */
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.grid.full-width {
+  grid-template-columns: 1fr;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 24px;
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.card:hover {
+  border-color: var(--accent);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.card-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-bright);
+}
+
+.card-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────── */
+/* TABLE STYLES */
+/* ──────────────────────────────────────────────────────────────────────────── */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+th {
+  text-align: left;
+  padding: 12px 14px;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--card-border);
+  font-weight: 700;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+td {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(48, 54, 61, 0.5);
+}
+
+tr:hover td {
+  background: rgba(88, 166, 255, 0.04);
+}
+
+.status {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.status-DONE { background: rgba(63, 185, 80, 0.15); color: #3fb950; }
+.status-IN_PROGRESS { background: rgba(88, 166, 255, 0.15); color: #58a6ff; }
+.status-PENDING { background: rgba(139, 148, 158, 0.15); color: #8b949e; }
+.status-BLOCKED { background: rgba(248, 81, 73, 0.15); color: #f85149; }
+.status-FAILED { background: rgba(248, 81, 73, 0.2); color: #f85149; }
+
+/* ──────────────────────────────────────────────────────────────────────────── */
+/* TIMELINE */
+/* ──────────────────────────────────────────────────────────────────────────── */
+
+.timeline {
+  max-height: 500px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--card-border) transparent;
+}
+
+.timeline-entry {
+  display: flex;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(48, 54, 61, 0.3);
+  font-size: 0.9rem;
+  align-items: flex-start;
+}
+
+.timeline-entry:last-child {
+  border-bottom: none;
+}
+
+.timeline-step {
+  min-width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.75rem;
+  background: rgba(88, 166, 255, 0.1);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.timeline-action {
+  flex: 1;
+  font-family: 'Courier New', monospace;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.timeline-reward {
+  font-weight: 700;
+  min-width: 70px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.timeline-reward.positive { color: var(--success); }
+.timeline-reward.negative { color: var(--danger); }
+
+/* ──────────────────────────────────────────────────────────────────────────── */
+/* SCORE PANEL */
+/* ──────────────────────────────────────────────────────────────────────────── */
+
+.score-final {
+  text-align: center;
+  padding: 32px 0;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.score-final .score {
+  font-size: 4rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.score-final .score-label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.score-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 14px 0;
+}
+
+.score-bar-label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  min-width: 180px;
+  font-weight: 500;
+}
+
+.score-bar-track {
+  flex: 1;
+  height: 6px;
+  background: rgba(48, 54, 61, 0.8);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.score-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s ease;
+}
+
+.score-bar-value {
+  font-size: 0.8rem;
+  font-weight: 700;
+  min-width: 60px;
+  text-align: right;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────── */
+/* INCIDENTS */
+/* ──────────────────────────────────────────────────────────────────────────── */
+
+.incident {
+  padding: 14px 16px;
+  margin: 10px 0;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  border-left: 4px solid;
+  line-height: 1.5;
+}
+
+.incident-miss {
+  background: rgba(248, 81, 73, 0.08);
+  border-color: var(--danger);
+  color: #ffa198;
+}
+
+.incident-fp {
+  background: rgba(210, 153, 34, 0.08);
+  border-color: var(--warning);
+  color: #fcd34d;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────── */
+/* RUN RESULTS */
+/* ──────────────────────────────────────────────────────────────────────────── */
+
+.run-results {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.result-chip {
+  background: rgba(88, 166, 255, 0.03);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.result-chip:hover {
+  border-color: var(--accent);
+}
+
+.result-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 24px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.result-num {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(88, 166, 255, 0.1);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.tier {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  min-width: 80px;
+}
+
+.chip-score {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
+}
+
+.chip-score.good { color: var(--success); }
+.chip-score.warn { color: var(--warning); }
+.chip-score.bad { color: var(--danger); }
+
+.chip-meta {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  flex: 1;
+}
+
+.chip-bar {
+  width: 120px;
+  height: 6px;
+  background: rgba(48, 54, 61, 0.8);
+  border-radius: 3px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.chip-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.expand-icon {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  transition: transform 0.25s;
+  flex-shrink: 0;
+}
+
+.result-chip.open .expand-icon {
+  transform: rotate(180deg);
+}
+
+.result-details {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease;
+}
+
+.result-chip.open .result-details {
+  max-height: 1000px;
+}
+
+.result-details-inner {
+  padding: 0 24px 24px;
+  border-top: 1px solid var(--card-border);
+}
+
+.detail-section {
+  margin-top: 24px;
+}
+
+.detail-section-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  margin-bottom: 16px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  font-size: 0.85rem;
+  border-bottom: 1px solid rgba(48, 54, 61, 0.3);
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-row .dl {
+  color: var(--text-dim);
+}
+
+.detail-row .dv {
+  font-weight: 700;
+  color: var(--text-bright);
+}
+
+.detail-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 12px 0;
+}
+
+.detail-bar-label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  min-width: 160px;
+  text-transform: capitalize;
+}
+
+.detail-bar-track {
+  flex: 1;
+  height: 4px;
+  background: rgba(48, 54, 61, 0.8);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.detail-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+}
+
+.detail-bar-val {
+  font-size: 0.8rem;
+  font-weight: 700;
+  min-width: 60px;
+  text-align: right;
+}
+
+.detail-actions {
+  max-height: 300px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--card-border) transparent;
+  margin-top: 8px;
+}
+
+.detail-action-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 10px 0;
+  font-size: 0.8rem;
+  border-bottom: 1px solid rgba(48, 54, 61, 0.2);
+}
+
+.detail-action-row:last-child {
+  border-bottom: none;
+}
+
+.detail-action-step {
+  width: 24px;
+  text-align: center;
+  color: var(--text-dim);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.detail-action-text {
+  flex: 1;
+  font-family: 'Courier New', monospace;
+  color: var(--text);
+}
+
+.detail-action-rwd {
+  font-weight: 700;
+  min-width: 60px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.detail-action-rwd.pos { color: var(--success); }
+.detail-action-rwd.neg { color: var(--danger); }
+
+.run-avg {
+  text-align: center;
+  padding: 24px;
+  margin-top: 24px;
+  font-size: 0.95rem;
+  color: var(--text-dim);
+  border-top: 1px solid var(--card-border);
+  background: rgba(88, 166, 255, 0.02);
+  border-radius: 12px;
+}
+
+.run-avg strong {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--text-bright);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────── */
+/* EMPTY STATE */
+/* ──────────────────────────────────────────────────────────────────────────── */
+
+.empty {
+  text-align: center;
+  color: var(--text-dim);
+  padding: 60px 20px;
+  font-size: 0.9rem;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────── */
+/* ANIMATIONS */
+/* ──────────────────────────────────────────────────────────────────────────── */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-in {
+  animation: fadeIn 0.3s ease;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────── */
+/* SCROLLBAR STYLING */
+/* ──────────────────────────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--card-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────── */
+/* RESPONSIVE */
+/* ──────────────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 1200px) {
+  .kpi-section {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .top-nav {
+    padding: 0 16px;
+    height: auto;
+    flex-direction: column;
+    padding-bottom: 12px;
+  }
+  
+  .nav-left {
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    align-items: flex-start;
+    padding-top: 12px;
+  }
+  
+  .status-bar {
+    flex-direction: column;
+    height: auto;
+    padding: 12px 16px;
+    gap: 12px;
+    top: auto;
+  }
+  
+  .content {
+    padding: 16px;
+  }
+  
+  .kpi-section {
+    grid-template-columns: 1fr;
+  }
+}
 </style>
 </head>
 <body>
-<div class="container">
-  <!-- Header -->
-  <div class="header">
-    <div>
-      <h1>🛡️ MissionCtrl</h1>
-      <div class="subtitle">AI Oversight Fleet Environment Dashboard</div>
+
+<!-- TOP NAVIGATION -->
+<nav class="top-nav">
+  <div class="nav-left">
+    <div class="logo">
+      <h2>MissionCtrl</h2>
     </div>
-    <div class="header-right">
-      <span class="badge badge-task" id="badge-task">TASK: —</span>
-      <span class="badge badge-step" id="badge-step">STEP: 0</span>
-      <span class="badge badge-done" id="badge-done" style="display:none">EPISODE DONE</span>
-      <span class="badge badge-health" id="badge-health">● LIVE</span>
+    <div class="nav-links">
+      <div class="nav-link active" onclick="switchTab('overview')">Overview</div>
+      <div class="nav-link" onclick="switchTab('tasks')">Tasks</div>
+      <div class="nav-link" onclick="switchTab('timeline')">Timeline</div>
+      <div class="nav-link" onclick="switchTab('results')">Results</div>
+    </div>
+  </div>
+  <div class="nav-right">
+    <div class="status-badges">
+      <span class="badge badge-health" id="badge-health">LIVE</span>
+    </div>
+  </div>
+</nav>
+
+<!-- STATUS BAR -->
+<div class="status-bar">
+  <div class="status-left">
+    AI Oversight Fleet Environment
+  </div>
+  <div class="status-badges">
+    <span class="badge badge-task" id="badge-task">TASK: —</span>
+    <span class="badge badge-step" id="badge-step">STEP: 0</span>
+    <span class="badge badge-done" id="badge-done" style="display:none">EPISODE DONE</span>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<main class="content">
+  <!-- OVERVIEW TAB -->
+  <div id="overview-tab" class="tab-content active">
+    <!-- CONTROLS -->
+    <div class="controls">
+      <select id="task-select">
+        <option value="easy">Easy — Basic Oversight</option>
+        <option value="medium">Medium — Multi-Agent Triage</option>
+        <option value="hard">Hard — Adversarial Fleet</option>
+        <option value="special">Special — Hallucination Forensics</option>
+      </select>
+      <button class="btn btn-primary" id="btn-reset">Reset Episode</button>
+    </div>
+
+    <!-- KPI SECTION -->
+    <div class="kpi-section">
+      <div class="kpi-card">
+        <div class="kpi-label">Cumulative Reward</div>
+        <div class="kpi-value" id="kpi-reward">0.00</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Detection Rate</div>
+        <div class="kpi-value" id="kpi-detection">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">False Positive Rate</div>
+        <div class="kpi-value" id="kpi-fp">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Tasks Completed</div>
+        <div class="kpi-value" id="kpi-tasks">0 / 0</div>
+      </div>
+    </div>
+
+    <!-- MAIN GRID -->
+    <div class="grid">
+      <!-- TASK TABLE PREVIEW -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Active Tasks</div>
+            <div class="card-subtitle">Overview of the current task graph</div>
+          </div>
+          <button class="btn" onclick="switchTab('tasks')" style="padding: 6px 12px; font-size: 0.8rem;">View All</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Title</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="task-table-preview">
+            <tr><td colspan="3" class="empty">Awaiting reset…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ACTION TIMELINE PREVIEW -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Recent Actions</div>
+            <div class="card-subtitle">Latest environment interactions</div>
+          </div>
+          <button class="btn" onclick="switchTab('timeline')" style="padding: 6px 12px; font-size: 0.8rem;">View Timeline</button>
+        </div>
+        <div class="timeline" id="timeline-preview" style="max-height: 250px;">
+          <div class="empty">No actions yet</div>
+        </div>
+      </div>
+
+      <!-- SCORE BREAKDOWN (Always visible in Overview when done) -->
+      <div class="card" id="score-card" style="display:none">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Score Breakdown</div>
+            <div class="card-subtitle">Final grader score and signal contributions</div>
+          </div>
+        </div>
+        <div class="score-final">
+          <div class="score" id="score-value">—</div>
+          <div class="score-label">Final Grader Score</div>
+        </div>
+        <div id="score-bars"></div>
+      </div>
+
+      <!-- INCIDENTS -->
+      <div class="card" id="incident-card" style="display:none">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Incidents</div>
+            <div class="card-subtitle">Detected issues during episode</div>
+          </div>
+        </div>
+        <div id="incident-list"></div>
+      </div>
     </div>
   </div>
 
-  <!-- Controls -->
-  <div class="controls">
-    <select id="task-select">
-      <option value="easy">Easy — Basic Oversight</option>
-      <option value="medium">Medium — Multi-Agent Triage</option>
-      <option value="hard">Hard — Adversarial Fleet</option>
-      <option value="special">Special — Hallucination Forensics</option>
-    </select>
-    <button class="btn btn-primary" id="btn-reset">⟳ Reset</button>
-  </div>
-
-  <!-- KPI Strip -->
-  <div class="kpi-strip">
-    <div class="kpi-card">
-      <div class="kpi-label">Cumulative Reward</div>
-      <div class="kpi-value" id="kpi-reward">0.00</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Detection Rate</div>
-      <div class="kpi-value" id="kpi-detection">—</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">False Positive Rate</div>
-      <div class="kpi-value" id="kpi-fp">—</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Tasks Completed</div>
-      <div class="kpi-value" id="kpi-tasks">0 / 0</div>
-    </div>
-  </div>
-
-  <!-- Main Grid -->
-  <div class="grid">
-    <!-- Task Table -->
+  <!-- TASKS TAB -->
+  <div id="tasks-tab" class="tab-content">
     <div class="card">
-      <div class="card-title"><span>📋</span> Task Graph</div>
+      <div class="card-header">
+        <div>
+          <div class="card-title">Full Task Graph</div>
+          <div class="card-subtitle">Comprehensive list of all tasks in the current episode</div>
+        </div>
+      </div>
       <table>
-        <thead><tr><th>ID</th><th>Title</th><th>Agent</th><th>Status</th></tr></thead>
-        <tbody id="task-table"><tr><td colspan="4" class="empty">Awaiting reset…</td></tr></tbody>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Title</th>
+            <th>Agent</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="task-table">
+          <tr><td colspan="4" class="empty">Awaiting reset…</td></tr>
+        </tbody>
       </table>
     </div>
+  </div>
 
-    <!-- Action Timeline -->
+  <!-- TIMELINE TAB -->
+  <div id="timeline-tab" class="tab-content">
     <div class="card">
-      <div class="card-title"><span>⏱️</span> Action Timeline</div>
-      <div class="timeline" id="timeline"><div class="empty">No actions yet</div></div>
-    </div>
-
-    <!-- Score Breakdown -->
-    <div class="card" id="score-card" style="display:none">
-      <div class="card-title"><span>📊</span> Score Breakdown</div>
-      <div class="score-final">
-        <div class="score" id="score-value">—</div>
-        <div style="color:var(--text-dim);font-size:.8rem">Final Grader Score</div>
+      <div class="card-header">
+        <div>
+          <div class="card-title">Complete Action Timeline</div>
+          <div class="card-subtitle">Full historical log of environment interactions</div>
+        </div>
       </div>
-      <div id="score-bars"></div>
+      <div class="timeline" id="timeline">
+        <div class="empty">No actions yet</div>
+      </div>
     </div>
+  </div>
 
-    <!-- Incidents -->
-    <div class="card" id="incident-card" style="display:none">
-      <div class="card-title"><span>🚨</span> Incidents</div>
-      <div id="incident-list"></div>
-    </div>
-
-    <!-- Run Results -->
-    <div class="card full-width" id="run-results-card">
-      <div class="card-title"><span>🏆</span> Run Results</div>
-      <div class="run-results" id="run-results"><div class="empty">No completed tasks yet</div></div>
+  <!-- RESULTS TAB -->
+  <div id="results-tab" class="tab-content">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Historical Run Results</div>
+          <div class="card-subtitle">Performance analysis across all completed episodes</div>
+        </div>
+      </div>
+      <div class="run-results" id="run-results">
+        <div class="empty">No completed tasks yet</div>
+      </div>
       <div class="run-avg" id="run-avg" style="display:none"></div>
     </div>
   </div>
-</div>
+</main>
 
 <script>
 const API = '';
@@ -239,6 +1037,24 @@ let lastHistoryLen = 0;
 let prevStep = 0;
 let prevTask = '';
 let prevDone = false;
+
+// ── Tab Switching ────────────────────────────────────────────────────────
+
+function switchTab(tabId) {
+  // Update nav links
+  document.querySelectorAll('.nav-link').forEach(link => {
+    link.classList.remove('active');
+    if (link.textContent.toLowerCase() === tabId) {
+      link.classList.add('active');
+    }
+  });
+
+  // Update content
+  document.querySelectorAll('.tab-content').forEach(content => {
+    content.classList.remove('active');
+  });
+  document.getElementById(tabId + '-tab').classList.add('active');
+}
 
 // ── Polling ──────────────────────────────────────────────────────────────
 
@@ -255,10 +1071,10 @@ function startPolling() {
       const runResults = resultsRes.ok ? await resultsRes.json() : [];
       updateDashboard(state, history);
       updateRunResults(runResults);
-      document.getElementById('badge-health').textContent = '● LIVE';
+      document.getElementById('badge-health').textContent = 'LIVE';
       document.getElementById('badge-health').classList.remove('offline');
     } catch {
-      document.getElementById('badge-health').textContent = '● OFFLINE';
+      document.getElementById('badge-health').textContent = 'OFFLINE';
       document.getElementById('badge-health').classList.add('offline');
     }
   }, 1500);
@@ -347,27 +1163,40 @@ function updateDashboard(state, history) {
   const liveStats = state.hallucination_stats || {};
   updateHallucinationKpis(liveStats, tasks.length > 0);
 
-  // Task table
+  // Task table (Main)
   const tbody = document.getElementById('task-table');
   if (tasks.length > 0) {
     tbody.innerHTML = tasks.map(t => `
       <tr class="animate-in">
-        <td style="font-family:monospace;font-size:.75rem">${t.task_id}</td>
+        <td style="font-family:monospace;font-size:0.85rem">${t.task_id}</td>
         <td>${t.title}</td>
-        <td style="font-size:.75rem;color:var(--text-dim)">${t.assigned_agent}</td>
+        <td style="font-size:0.85rem;color:var(--text-dim)">${t.assigned_agent}</td>
         <td><span class="status status-${t.status}">${t.status}</span></td>
       </tr>
     `).join('');
+
+    // Task table (Preview)
+    const previewBody = document.getElementById('task-table-preview');
+    previewBody.innerHTML = tasks.slice(0, 5).map(t => `
+      <tr class="animate-in">
+        <td style="font-family:monospace;font-size:0.85rem">${t.task_id}</td>
+        <td>${t.title}</td>
+        <td><span class="status status-${t.status}">${t.status}</span></td>
+      </tr>
+    `).join('') + (tasks.length > 5 ? `<tr><td colspan="3" style="text-align:center;color:var(--text-dim);font-size:0.8rem;padding:8px;">+ ${tasks.length - 5} more tasks</td></tr>` : '');
   }
 
   // Timeline
   if (history.length !== lastHistoryLen) {
     lastHistoryLen = history.length;
     const tl = document.getElementById('timeline');
+    const tlPreview = document.getElementById('timeline-preview');
+    
     if (history.length === 0) {
       tl.innerHTML = '<div class="empty">No actions yet</div>';
+      tlPreview.innerHTML = '<div class="empty">No actions yet</div>';
     } else {
-      tl.innerHTML = history.map(h => {
+      const historyHtml = history.map(h => {
         const rClass = (h.reward || 0) >= 0 ? 'positive' : 'negative';
         const rSign = (h.reward || 0) >= 0 ? '+' : '';
         return `<div class="timeline-entry animate-in">
@@ -376,7 +1205,20 @@ function updateDashboard(state, history) {
           <div class="timeline-reward ${rClass}">${rSign}${(h.reward || 0).toFixed(1)}</div>
         </div>`;
       }).join('');
+      
+      tl.innerHTML = historyHtml;
       tl.scrollTop = tl.scrollHeight;
+      
+      // Preview shows last 5
+      tlPreview.innerHTML = history.slice(-5).reverse().map(h => {
+        const rClass = (h.reward || 0) >= 0 ? 'positive' : 'negative';
+        const rSign = (h.reward || 0) >= 0 ? '+' : '';
+        return `<div class="timeline-entry animate-in">
+          <div class="timeline-step">${h.step}</div>
+          <div class="timeline-action" style="font-size:0.8rem;">${h.action || '—'}</div>
+          <div class="timeline-reward ${rClass}" style="font-size:0.8rem;">${rSign}${(h.reward || 0).toFixed(1)}</div>
+        </div>`;
+      }).join('');
     }
   }
 
@@ -390,14 +1232,14 @@ function updateDashboard(state, history) {
     const signals = sb.signals || {};
     let barsHtml = '';
     const colors = {
-      task_completion: '#10b981', hallucination_detection: '#3b82f6',
-      false_positive_penalty: '#ef4444', delegation_efficiency: '#8b5cf6',
-      llm_judge_quality: '#f59e0b'
+      task_completion: '#3fb950', hallucination_detection: '#58a6ff',
+      false_positive_penalty: '#f85149', delegation_efficiency: '#a371f7',
+      llm_judge_quality: '#d29922'
     };
     for (const [key, sig] of Object.entries(signals)) {
       const pct = Math.abs(sig.value) * 100;
       const label = key.replace(/_/g, ' ');
-      const color = colors[key] || '#6366f1';
+      const color = colors[key] || '#58a6ff';
       barsHtml += `<div class="score-bar">
         <div class="score-bar-label">${label}</div>
         <div class="score-bar-track"><div class="score-bar-fill" style="width:${pct}%;background:${color}"></div></div>
@@ -415,12 +1257,10 @@ function updateDashboard(state, history) {
       document.getElementById('incident-card').style.display = '';
       let html = '';
       const missed = stats.total_injected - stats.total_caught;
-      if (missed > 0) html += `<div class="incident incident-miss">⚠️ ${missed} hallucination(s) went undetected</div>`;
-      if (stats.false_positives > 0) html += `<div class="incident incident-fp">⚠️ ${stats.false_positives} false positive flag(s)</div>`;
+      if (missed > 0) html += `<div class="incident incident-miss">Missed: ${missed} hallucination(s) undetected</div>`;
+      if (stats.false_positives > 0) html += `<div class="incident incident-fp">Flag: ${stats.false_positives} false positive flag(s)</div>`;
       document.getElementById('incident-list').innerHTML = html;
     }
-
-    // Keep polling alive so dashboard follows progress across next task/episode.
   }
 
   prevStep = currentStep;
@@ -459,15 +1299,15 @@ function toggleResult(idx) {
 function buildScoreBars(sb) {
   const signals = sb.signals || {};
   const colors = {
-    task_completion: '#10b981', hallucination_detection: '#3b82f6',
-    false_positive_penalty: '#ef4444', delegation_efficiency: '#8b5cf6',
-    llm_judge_quality: '#f59e0b'
+    task_completion: '#3fb950', hallucination_detection: '#58a6ff',
+    false_positive_penalty: '#f85149', delegation_efficiency: '#a371f7',
+    llm_judge_quality: '#d29922'
   };
   let html = '';
   for (const [key, sig] of Object.entries(signals)) {
     const pct = Math.min(Math.abs(sig.value || 0) * 100, 100);
     const label = key.replace(/_/g, ' ');
-    const color = colors[key] || '#6366f1';
+    const color = colors[key] || '#58a6ff';
     const contrib = sig.contribution || 0;
     html += `<div class="detail-bar">
       <div class="detail-bar-label">${label}</div>
@@ -475,11 +1315,11 @@ function buildScoreBars(sb) {
       <div class="detail-bar-val" style="color:${color}">${contrib >= 0 ? '+' : ''}${contrib.toFixed(3)}</div>
     </div>`;
   }
-  return html || '<div style="color:var(--text-dim);font-size:.75rem">No breakdown available</div>';
+  return html || '<div style="color:var(--text-dim);font-size:0.85rem">No breakdown available</div>';
 }
 
 function buildActionHistory(history) {
-  if (!history || history.length === 0) return '<div style="color:var(--text-dim);font-size:.75rem">No actions recorded</div>';
+  if (!history || history.length === 0) return '<div style="color:var(--text-dim);font-size:0.85rem">No actions</div>';
   return '<div class="detail-actions">' + history.map(h => {
     const rwd = h.reward || 0;
     const cls = rwd >= 0 ? 'pos' : 'neg';
@@ -505,11 +1345,11 @@ function updateRunResults(results) {
     return;
   }
 
-  const tierColors = { easy: '#10b981', medium: '#3b82f6', hard: '#f59e0b', special: '#8b5cf6' };
+  const tierColors = { easy: '#3fb950', medium: '#58a6ff', hard: '#d29922', special: '#a371f7' };
 
   container.innerHTML = results.map((r, i) => {
     const pct = Math.round((r.score || 0) * 100);
-    const color = tierColors[r.tier] || '#6366f1';
+    const color = tierColors[r.tier] || '#58a6ff';
     const hs = r.hallucination_stats || {};
     const tp = hs.true_positives ?? '—';
     const fp = hs.false_positives ?? '—';
@@ -532,21 +1372,21 @@ function updateRunResults(results) {
       <div class="result-details">
         <div class="result-details-inner">
           <div class="detail-section">
-            <div class="detail-section-title">📊 Score Breakdown</div>
+            <div class="detail-section-title">Score Breakdown</div>
             <div class="detail-row"><span class="dl">Raw Score</span><span class="dv">${rawScore}</span></div>
             <div class="detail-row"><span class="dl">Final Score</span><span class="dv">${(r.score || 0).toFixed(4)}</span></div>
             ${buildScoreBars(sb)}
           </div>
           <div class="detail-section">
-            <div class="detail-section-title">🔍 Hallucination Stats</div>
+            <div class="detail-section-title">Hallucination Stats</div>
             <div class="detail-row"><span class="dl">Injected</span><span class="dv">${injected}</span></div>
-            <div class="detail-row"><span class="dl">Caught</span><span class="dv" style="color:var(--green)">${caught}</span></div>
+            <div class="detail-row"><span class="dl">Caught</span><span class="dv" style="color:var(--success)">${caught}</span></div>
             <div class="detail-row"><span class="dl">Total Flags</span><span class="dv">${totalFlags}</span></div>
-            <div class="detail-row"><span class="dl">True Positives</span><span class="dv" style="color:var(--tp-green)">${tp}</span></div>
-            <div class="detail-row"><span class="dl">False Positives</span><span class="dv" style="color:var(--fp-red)">${fp}</span></div>
+            <div class="detail-row"><span class="dl">True Positives</span><span class="dv" style="color:#3fb950">${tp}</span></div>
+            <div class="detail-row"><span class="dl">False Positives</span><span class="dv" style="color:#f85149">${fp}</span></div>
           </div>
           <div class="detail-section">
-            <div class="detail-section-title">⏱️ Action History</div>
+            <div class="detail-section-title">Action History</div>
             ${buildActionHistory(r.history)}
           </div>
         </div>
