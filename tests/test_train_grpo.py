@@ -48,3 +48,25 @@ class TestGrpoRewardFn:
 
     def test_run_reward_smoke_succeeds(self):
         assert run_reward_smoke() is True
+
+    def test_parallel_rewards_match_sequential(self):
+        tag = "<!-- seed:1:difficulty:easy:num_tasks:3 -->"
+        prompt = [
+            {"role": "system", "content": "x"},
+            {"role": "user",   "content": f"u\n\n{tag}"},
+        ]
+        prompts = [prompt, prompt, prompt, prompt]
+        completions = [
+            "APPROVE(T001)",
+            "FLAG(T002, \"e\")",
+            "APPROVE(T001)",
+            "REJECT(T003, \"r\")",
+        ]
+        os.environ["MISSIONCTRL_REWARD_THREADS"] = "1"
+        seq = grpo_reward_fn(completions, prompts)
+        os.environ["MISSIONCTRL_REWARD_THREADS"] = "4"
+        par = grpo_reward_fn(completions, prompts)
+        os.environ.pop("MISSIONCTRL_REWARD_THREADS", None)
+        assert len(seq) == len(par) == len(completions)
+        for a, b in zip(seq, par, strict=True):
+            assert a == b

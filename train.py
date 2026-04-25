@@ -127,13 +127,18 @@ MODEL_NAME      = os.environ.get(
     "unsloth/Llama-3.2-3B-Instruct",
 )
 MAX_SEQ_LEN     = 4096
+# Aligned with GRPOConfig.max_completion_length, evaluate() max_new_tokens, and FIX #22 prompt cap.
+COMPLETION_MAX_TOKENS = int(
+    os.environ.get("MISSIONCTRL_COMPLETION_MAX_TOKENS", "128").strip() or "128"
+)
 # Council: start at 16; try 32 if a baseline run plateaus. Override: MISSIONCTRL_LORA_RANK
 LORA_RANK       = int(os.environ.get("MISSIONCTRL_LORA_RANK", "16"))
 BATCH_SIZE      = 4
 GRAD_ACCUM      = 4                             # effective batch = 16
 LEARNING_RATE   = 2e-5
 NUM_GENERATIONS = 4                             # FIX #2: must be ≤ BATCH_SIZE (was 8, now 4)
-SAVE_STEPS      = 50
+# Long Kaggle runs: reduce checkpoint I/O; override: MISSIONCTRL_SAVE_STEPS
+SAVE_STEPS      = int(os.environ.get("MISSIONCTRL_SAVE_STEPS", "200").strip() or "200")
 HF_REPO         = "Proliferation/missionctrl"  # set before push
 
 # FIX #32: stronger HF_REPO validation (case-insensitive, catches more placeholders)
@@ -204,6 +209,15 @@ if os.environ.get("MISSIONCTRL_T4_CURRICULUM", "").strip().lower() in ("1", "tru
         pass
 
 # EPISODE_MAX_STEPS: imported from grpo_rewards (single source; matches MissionCtrlEnv default)
+
+# Kaggle: default none; local debugging: MISSIONCTRL_REPORT_TO=tensorboard
+_DEFAULT_REPORT = os.environ.get("MISSIONCTRL_REPORT_TO", "none").strip() or "none"
+
+
+def _phase_n_samples(phase_steps: int) -> int:
+    """Dataset size per phase: scales with step budget, min 200 (GRPO speedup: avoid 500 static rows)."""
+    return max(phase_steps * 4, 200)
+
 
 # ── System Prompt ─────────────────────────────────────────────────────────────
 
@@ -279,7 +293,7 @@ State your reasoning first (1-3 sentences with specific evidence), then your act
 def generate_training_samples(
     difficulty: str,
     num_tasks: int,
-    n_samples: int = 500,   # FIX #8 (dataset quality): increased from 300 to 500
+    n_samples: int = 200,
     seed_start: int = 0,
 ) -> list[dict]:
     """
@@ -379,7 +393,7 @@ def load_model():
             "gate_proj", "up_proj", "down_proj",
         ],
         lora_alpha           = LORA_RANK * 2,
-        lora_dropout         = 0.05,
+        lora_dropout         = 0.0,  # 0.05 has measurable throughput cost in Unsloth/PEFT
         bias                 = "none",
         use_gradient_checkpointing = "unsloth",   # ~30% VRAM reduction
         random_state         = 42,
@@ -442,13 +456,15 @@ def evaluate(
     tokenizer,
     difficulty: str = "hard",
     num_tasks: int  = 4,
-    n_episodes: int = 20,
+    n_episodes: int | None = None,
     is_mid_training: bool = False,
 ) -> tuple[float, dict]:
     """
-    Run N evaluation episodes and return (mean_reward, aggregated_metrics).
+    Run N evaluation episodes and return (mean_reward, aggregated metrics).
     Uses greedy decoding (do_sample=False) for reproducible eval.  # FIX #23
     """
+    if n_episodes is None:
+        n_episodes = int(os.environ.get("MISSIONCTRL_EVAL_EPISODES", "10").strip() or "10")
     FastLanguageModel.for_inference(model)
 
     rewards      = []
@@ -480,13 +496,13 @@ def evaluate(
                 prompt_text,
                 return_tensors = "pt",
                 truncation     = True,
-                max_length     = MAX_SEQ_LEN - 512,
+                max_length     = MAX_SEQ_LEN - COMPLETION_MAX_TOKENS,
             ).to(mdev)
 
             with torch.no_grad():
                 outputs = model.generate(
                     **inputs,
-                    max_new_tokens = 256,
+                    max_new_tokens = COMPLETION_MAX_TOKENS,
                     do_sample      = False,   # FIX #23: truly greedy for reproducible eval
                 )
 
@@ -676,7 +692,7 @@ def train():
             samples = generate_training_samples(
                 difficulty  = phase["difficulty"],
                 num_tasks   = phase["num_tasks"],
-                n_samples   = 500,  # FIX: increased from 300 for better coverage
+                n_samples   = _phase_n_samples(phase["steps"]),
                 seed_start  = phase_idx * 1000 + phase_attempts * 100,
             )
             dataset = Dataset.from_list(samples)
@@ -697,12 +713,12 @@ def train():
                 gradient_accumulation_steps = GRAD_ACCUM,
                 learning_rate               = LEARNING_RATE,
                 num_generations             = NUM_GENERATIONS,   # FIX #2: ≤ BATCH_SIZE
-                max_completion_length       = 512,
-                max_prompt_length           = MAX_SEQ_LEN - 512,  # FIX #22: prevent seed tag truncation
+                max_completion_length       = COMPLETION_MAX_TOKENS,
+                max_prompt_length           = MAX_SEQ_LEN - COMPLETION_MAX_TOKENS,  # FIX #22: lockstep with completion budget
                 temperature                 = 0.7,
                 logging_steps               = 10,
                 save_steps                  = SAVE_STEPS,
-                report_to                   = "tensorboard",
+                report_to                   = _DEFAULT_REPORT,
                 seed                        = 42,
             )
 
@@ -721,8 +737,7 @@ def train():
             avg_reward, metrics = evaluate(
                 model, tokenizer,
                 phase["difficulty"], phase["num_tasks"],
-                n_episodes = 20,
-                is_mid_training = True,
+                is_mid_training=True,
             )
 
             if avg_reward >= phase["min_reward"]:
@@ -821,7 +836,12 @@ if __name__ == "__main__":
         model.load_adapter(args.checkpoint)
         evaluate(model, tokenizer)
     else:
-        baseline = run_baseline()
-        print(f"\n🎯 Baseline established: {baseline:.3f} (ceiling: 0.85)")
+        if os.environ.get("MISSIONCTRL_SKIP_BASELINE", "").strip().lower() in (
+            "1", "true", "yes",
+        ):
+            print("  ⏭️  MISSIONCTRL_SKIP_BASELINE set — skipping pre-training baseline")
+        else:
+            baseline = run_baseline()
+            print(f"\n🎯 Baseline established: {baseline:.3f} (ceiling: 0.85)")
         print("Starting curriculum training...\n")
         train()

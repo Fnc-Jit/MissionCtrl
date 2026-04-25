@@ -6,7 +6,9 @@ GRPO reward rollout for MissionCtrl (no torch) — used by `train.GRPOTrainer` a
 from __future__ import annotations
 
 import logging
+import os
 import re
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from grpo_completion import _completion_to_text
@@ -51,6 +53,71 @@ def _greedy_completion_action(env: MissionCtrlEnv) -> OverseerAction:
     return OverseerAction("NOOP")
 
 
+def _single_completion_reward(i: int, completion: Any, prompts: list) -> float:
+    """
+    One GRPO completion → scalar reward. Used (possibly in parallel) by grpo_reward_fn;
+    each call owns a fresh MissionCtrlEnv — no cross-thread state.
+    """
+    try:
+        # Extract seed from embedded tag in prompt
+        prompt_text = ""
+        if i < len(prompts):
+            p = prompts[i]
+            if isinstance(p, list):
+                prompt_text = " ".join(
+                    msg.get("content", "") if isinstance(msg, dict) else str(msg)
+                    for msg in p
+                )
+            else:
+                prompt_text = str(p)
+
+        seed_match = re.search(
+            r"<!-- seed:(\d+):difficulty:(\w+):num_tasks:(\d+) -->",
+            prompt_text
+        )
+
+        if seed_match:
+            episode_seed = int(seed_match.group(1))
+            difficulty   = seed_match.group(2)
+            num_tasks    = int(seed_match.group(3))
+        else:
+            # Fallback defaults if tag not found
+            logger.warning("Seed tag not found in prompt %d, using defaults", i)
+            episode_seed = i
+            difficulty   = "medium"
+            num_tasks    = 3
+
+        # Reconstruct env deterministically from seed
+        env = MissionCtrlEnv(
+            difficulty=difficulty,
+            num_tasks=num_tasks,
+            seed=episode_seed,
+            max_steps=EPISODE_MAX_STEPS,  # FIX #39
+        )
+        env.reset(seed=episode_seed)
+
+        # FIX #1: Apply model's action for this step, then run episode to completion
+        # using a greedy policy (approve first available in-progress task)
+        action = parse_action(_completion_to_text(completion))
+        _, _, terminated, truncated, _ = env.step(action)
+
+        # Complete the episode with simple greedy policy
+        step_count = 1
+        while not (terminated or truncated) and step_count < EPISODE_MAX_STEPS:
+            greedy_action = _greedy_completion_action(env)
+            _, _, terminated, truncated, _ = env.step(greedy_action)
+            step_count += 1
+
+        # FIX #3: Use FINAL reward (state score at episode end), not a sum
+        final_reward = compute_reward(env)
+        return float(final_reward)
+
+    except Exception as e:
+        # FIX #20: log the exception so bugs are visible during training
+        logger.warning("Reward fn error for completion %d: %s", i, e)
+        return 0.0
+
+
 def grpo_reward_fn(completions: list[Any], prompts: list, **kwargs) -> list[float]:
     """
     GRPO reward function called by TRL.
@@ -71,69 +138,28 @@ def grpo_reward_fn(completions: list[Any], prompts: list, **kwargs) -> list[floa
     Coerce `completion` to str (see grpo_completion._completion_to_text) — TRL may
     pass list/dict message parts, unlike evaluate() which decodes a single string.
     """
-    rewards = []
+    n = len(completions)
+    if n == 0:
+        return []
 
-    for i, completion in enumerate(completions):
+    raw = os.environ.get("MISSIONCTRL_REWARD_THREADS", "").strip()
+    if raw == "1":
+        return [_single_completion_reward(i, c, prompts) for i, c in enumerate(completions)]
+    if raw:
         try:
-            # Extract seed from embedded tag in prompt
-            prompt_text = ""
-            if i < len(prompts):
-                p = prompts[i]
-                if isinstance(p, list):
-                    prompt_text = " ".join(
-                        msg.get("content", "") if isinstance(msg, dict) else str(msg)
-                        for msg in p
-                    )
-                else:
-                    prompt_text = str(p)
-
-            seed_match = re.search(
-                r"<!-- seed:(\d+):difficulty:(\w+):num_tasks:(\d+) -->",
-                prompt_text
-            )
-
-            if seed_match:
-                episode_seed = int(seed_match.group(1))
-                difficulty   = seed_match.group(2)
-                num_tasks    = int(seed_match.group(3))
-            else:
-                # Fallback defaults if tag not found
-                logger.warning(f"Seed tag not found in prompt {i}, using defaults")
-                episode_seed = i
-                difficulty   = "medium"
-                num_tasks    = 3
-
-            # Reconstruct env deterministically from seed
-            env = MissionCtrlEnv(
-                difficulty=difficulty,
-                num_tasks=num_tasks,
-                seed=episode_seed,
-                max_steps=EPISODE_MAX_STEPS,  # FIX #39
-            )
-            env.reset(seed=episode_seed)
-
-            # FIX #1: Apply model's action for this step, then run episode to completion
-            # using a greedy policy (approve first available in-progress task)
-            action = parse_action(_completion_to_text(completion))
-            _, _, terminated, truncated, _ = env.step(action)
-
-            # Complete the episode with simple greedy policy
-            step_count = 1
-            while not (terminated or truncated) and step_count < EPISODE_MAX_STEPS:
-                greedy_action = _greedy_completion_action(env)
-                _, _, terminated, truncated, _ = env.step(greedy_action)
-                step_count += 1
-
-            # FIX #3: Use FINAL reward (state score at episode end), not a sum
-            final_reward = compute_reward(env)
-            rewards.append(float(final_reward))
-
-        except Exception as e:
-            # FIX #20: log the exception so bugs are visible during training
-            logger.warning(f"Reward fn error for completion {i}: {e}")
-            rewards.append(0.0)
-
-    return rewards
+            max_workers = max(1, int(raw, 10))
+        except ValueError:
+            max_workers = min(4, n) or 1
+        max_workers = min(max_workers, n)
+    else:
+        max_workers = min(4, n) or 1
+    if max_workers == 1 or n == 1:
+        return [_single_completion_reward(i, c, prompts) for i, c in enumerate(completions)]
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        futures = [
+            ex.submit(_single_completion_reward, i, completions[i], prompts) for i in range(n)
+        ]
+        return [f.result() for f in futures]
 
 
 def run_reward_smoke() -> bool:
