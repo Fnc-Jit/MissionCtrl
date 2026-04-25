@@ -364,10 +364,13 @@ Set these in the shell or Colab **before** running `train.py` (not read from `.e
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `MISSIONCTRL_MODEL_NAME` | `unsloth/Llama-3.2-3B-Instruct` | Unsloth QLoRA base. Default is **3B** for a full canary; after that succeeds, set to `unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit` for 8B. Gated models may need `HF_TOKEN` and license acceptance. |
 | `MISSIONCTRL_LORA_RANK` | `16` | LoRA rank. Council guidance: start at 16; try `32` if a baseline run plateaus. |
 | `MISSIONCTRL_EARLY_STOP_PHASE1` | `1` | If set to `1`, enables early stop when phase 1 (easy) reward is flat after a minimum step count. |
 | `MISSIONCTRL_EARLY_STOP_MIN_STEPS` | `75` | Minimum training steps in phase 1 before the flat-reward check applies. |
 | `MISSIONCTRL_EARLY_STOP_LOG_WINDOW` | `3` | Number of recent `logging_steps` log points used to detect a flat reward. |
+| `MISSIONCTRL_SMOKE_STEPS` | (unset) | If set to a positive integer, `train()` runs a single easy phase with that many `max_steps` and skips `push_to_hub` (GPU dry run). |
+| `MISSIONCTRL_T4_CURRICULUM` | (unset) | If `1`/`true`/`yes` on a **single** GPU, uses a shorter 100+150+100 step curriculum. |
 
 ### Configuration Notes
 
@@ -381,10 +384,12 @@ Set these in the shell or Colab **before** running `train.py` (not read from `.e
 
 Hackathon and OpenEnv evaluators run **`inference.py` / `client.py` against your configured API**, not the Unsloth process. Fine-tuning improves the score only if the **same** `API_BASE_URL` and `MODEL_NAME` point at a stack that actually loads your trained adapter.
 
-1. **Confirm the scoring model** — After `train.py` pushes a LoRA adapter to HuggingFace, point inference at a **router or provider** that can serve the **base** `Qwen/Qwen2.5-7B-Instruct` (or your chosen base) **plus** that adapter. If you leave defaults (`openai/gpt-oss-120b`, Groq `llama-3.3-70b-versatile`, etc.), you are not evaluating the weights you trained.
-2. **Match base model ID** — Training in `train.py` defaults to `Qwen/Qwen2.5-7B-Instruct`. Your inference `MODEL_NAME` and adapter must be **compatible** with that base.
+1. **Confirm the scoring model** — After `train.py` pushes a LoRA adapter to HuggingFace, point inference at a **router or provider** that can serve the **base** you trained (default 3B canary: `unsloth/Llama-3.2-3B-Instruct`, or 8B: `unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit` when you switch) **plus** that adapter. If you leave inference defaults (`openai/gpt-oss-120b`, Groq `llama-3.3-70b-versatile`, etc.), you are not evaluating the weights you trained.
+2. **Match base model ID** — Training defaults to the Unsloth 3B instruct checkpoint; run **8B** only by setting `MISSIONCTRL_MODEL_NAME` to `unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit` after the 3B canary. Your served `MODEL_NAME` and LoRA must match the **same** base you fine-tuned.
 3. **Reproduce before submit** — From the same repo: run the server, set `API_BASE_URL` / `MODEL_NAME` / `HF_TOKEN` in `.env` to the intended eval stack, then run `python client.py` or `python inference.py` and compare scores to a smoke run on a public baseline model.
 4. **HF Hub is adapter by default** — `train.py` calls `push_to_hub` for the PEFT/LoRA adapter. Consumers must load **base + adapter** (e.g. Unsloth/PEFT on Colab) unless you add a separate merge/publish step.
+
+**Workflow:** run a **full 3B** job with defaults first; when satisfied, re-run with `MISSIONCTRL_MODEL_NAME=unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit`. Optionally `python train.py --smoke-train` with the same 8B id to OOM-check before a long 8B run.
 
 **Training-only environment variables (optional, e.g. Colab or shell before `python train.py`):** see **GRPO / LoRA training (optional)** in the environment variables section above.
 

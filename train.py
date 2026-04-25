@@ -8,20 +8,29 @@ Requirements (run this cell first in Colab):
   !pip install "unsloth[colab-new]" trl openenv transformers datasets accelerate matplotlib
   !pip install --upgrade bitsandbytes
 
-Model  : Qwen2.5-7B-Instruct (fast to train, strong reasoning baseline)
+Model  : default `unsloth/Llama-3.2-3B-Instruct` (full canary in one run). After 3B looks
+good, set `MISSIONCTRL_MODEL_NAME` to `unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit` (see
+`DEFAULT_MODEL_8B_UNSLOTH` in code). Gated hubs may need `HF_TOKEN` and license acceptance.
+
 Method : GRPO (Group Relative Policy Optimization) via TRL
 
-Expected training time on A100: ~2-3 hours for visible reward improvement
-Expected reward curve: 0.28 → 0.75+ after 500 steps
+Expected training time on A100: full 500 max_steps 3B run often ~1-1.5 h (not guaranteed);
+8B for the same curriculum often ~2-3 h. Phase repeats add time.
+Expected reward curve: 0.28 to 0.75+ after 500 steps (stronger targets for the 8B run
+after 3B canary).
 
 Default curriculum total: 500 GRPO max_steps (150+200+150) on a single GPU,
 plus per-phase eval; allow extra time if a phase repeats (see MAX_PHASE_REPEATS).
 T4 (low VRAM): same step counts unless you set MISSIONCTRL_SMOKE_STEPS or
 MISSIONCTRL_T4_CURRICULUM — expect wall time much longer than A100 (often hours more).
 
-Pre-flight: run `python train.py --reward-smoke` (no model), `python train.py
---baseline-only` (no GRPO), then optional `python train.py --smoke-train` on GPU
-(2-step GRPO; skips Hub push). Unit tests: `pytest tests/test_train_grpo.py`.
+Pre-flight (3B default, 8B only after verification):
+  1) `pytest tests/test_train_grpo.py` and `python train.py --reward-smoke` (no GPU model)
+  2) Optional: `python train.py --smoke-train` on default 3B (2 GRPO steps)
+  3) Full `train` with defaults = 3B canary (full curriculum)
+  4) `MISSIONCTRL_MODEL_NAME=unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit` and full train for 8B
+  Optional: same 8B id + `python train.py --smoke-train` to OOM-check 8B before a long run
+  Also: `python train.py --baseline-only` (no GRPO).
 
 Reward ceiling: 0.85 (not 1.0). A score of 0.75+ represents ~88% of maximum.
 See reward_model.py for signal breakdown.
@@ -87,7 +96,13 @@ if HF_TOKEN:
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-MODEL_NAME      = "Qwen/Qwen2.5-7B-Instruct"   # swap for Llama-3.1-8B-Instruct if preferred
+# Unsloth 3.1 8B Instruct 4-bit — use after 3B canary succeeds (set MISSIONCTRL_MODEL_NAME).
+DEFAULT_MODEL_8B_UNSLOTH = "unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit"
+
+MODEL_NAME      = os.environ.get(
+    "MISSIONCTRL_MODEL_NAME",
+    "unsloth/Llama-3.2-3B-Instruct",
+)
 MAX_SEQ_LEN     = 4096
 # Council: start at 16; try 32 if a baseline run plateaus. Override: MISSIONCTRL_LORA_RANK
 LORA_RANK       = int(os.environ.get("MISSIONCTRL_LORA_RANK", "16"))
