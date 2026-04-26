@@ -108,22 +108,17 @@ score = 0.30 × task_completion          # DONE tasks; partial credit for correc
 
 > **Theoretical ceiling: 0.85** (when FP rate = 0). A 0.75 score represents ~88% of maximum.
 
-### Reward model plot + metric-level summary
+### Curriculum reward plot + metric context
 
-![Reward model plot](Asset/Rewardmodel.png)
+![MissionCtrl — curriculum training reward progression](Asset/RewardM.png)
 
-What this file is: a composite reward function for an `OverseerAgent` in MissionCtrl. The overseer watches specialist sub-agents completing a software project and this function scores how well it supervised the fleet.
+This figure is the **curriculum mean episode reward** trajectory (easy -> medium -> hard), not a signal-weight diagram. It shows how training moved across phases: **0.29 -> 0.07 -> 0.17** (rounded), with the dashed baseline around **0.29** and ceiling reference **0.85**.
 
-- **S1 — `signal_task_completion` (30%)**: loops through tasks. A completed clean task scores **1.0**. A hallucinated task that was caught but not fully resolved scores **0.5**. A hallucinated task that was approved without being flagged scores **0.0**.
-- **S2 — `signal_hallucination_detection` (30%)**: pure recall, `|injected ∩ caught| / |injected|`. If no hallucinations were injected, defaults to **1.0**.
-- **S3 — `signal_false_positive_penalty` (-15%)**: penalty term, `|false_positives| / |all_flags|`, then multiplied by **-0.15**. Includes a passive **0.4** penalty for doing nothing on non-easy tiers once all outputs are visible (FIX #25).
-- **S4 — `signal_delegation_efficiency` (15%)**: redelegation quality. +1.0 when redelegation leads to DONE, +0.3 partial credit, -0.5 for same-agent redelegation, -0.5 for circular bounces (3+ redelegations on one task). No redelegation defaults to **1.0**.
-- **S5 — `signal_llm_judge` (10%)**: either heuristic mock judge or live API judge. The mock uses domain-specific evidence keywords (tightened in FIX #26), correctness of FLAG outcomes, and NOOP penalties. The API judge scores specificity, consistency, and proportionality, then averages.
+The score itself is still the **five-signal composite** in `reward_model.py` (weights summarized in the table above): task completion, hallucination recall, false-positive penalty, delegation efficiency, and judge quality.
 
 Design notes:
-- **Theoretical max is 0.85 (not 1.0)** because S3 is a negative weight and contributes 0 at perfect performance.
-- The judge logic is intentionally hardened against evidence-length gaming by preferring domain-relevant phrases.
-- Iterative fix history (many `FIX #..` notes) reflects battle-testing against reward-gaming behavior.
+- **Theoretical max remains 0.85 (not 1.0)** because the false-positive term is negative and contributes 0 at perfect behavior.
+- The curriculum curve and signal weights should be read together: curve = training trajectory, composite = grading contract.
 
 ![Reward-model trace snapshot](Asset/SCR-20260426-lviq.png)
 

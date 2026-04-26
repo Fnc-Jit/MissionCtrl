@@ -90,11 +90,11 @@ The **final score** is a **five-signal composite** in `reward_model.py` — task
 
 Per-step shaping still **hurts** in the right places: false flags, approving injected content, premature synthesize — the README tables are the cheat sheet; the engine is the judge.
 
-![Reward model plot](Asset/Rewardmodel.png)
+![MissionCtrl — curriculum training reward progression](Asset/RewardM.png)
 
-Under the hood, that reward model is not hand-wavy. It is explicit and weighted: **S1 task completion (30%)**, **S2 hallucination detection recall (30%)**, **S3 false-positive penalty (-15%)**, **S4 delegation efficiency (15%)**, and **S5 judge quality (10%)**. A clean completed task gets full credit, a caught-but-unresolved hallucinated task gets partial credit, and approving a hallucination without flagging it first gets zero. False flags are penalized directly, and there is even a passive anti-idle penalty when the overseer does nothing once all outputs are visible on non-easy tiers.
+This is the **curriculum reward trajectory** figure (easy -> medium -> hard), not the old signal-weight schematic: **0.29 -> 0.07 -> 0.17** with the same **0.85** ceiling reference used by the scorer. It answers "did training move?" while the composite contract in `reward_model.py` answers "what exactly is being rewarded?".
 
-The judge signal is also designed to resist easy gaming. The mock path rewards domain-specific evidence phrases (tightened in FIX #26), not just long text. The API path grades specificity, consistency, and proportionality. That is why the ceiling is **0.85** rather than 1.0: with a negative false-positive term, perfect behavior means that term contributes zero, not a bonus.
+The judge signal is still designed to resist easy gaming (domain-specific evidence over verbosity), and the 0.85 cap still comes from the negative false-positive term: perfect behavior gets **no penalty**, not bonus points above the ceiling.
 
 ![Reward-model trace snapshot](Asset/SCR-20260426-lviq.png)
 
