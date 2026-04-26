@@ -27,7 +27,7 @@ Expected training time on 2×T4: 0.5B is much faster than 3B/8B; full curriculum
 with steps and phase repeats. Larger models set via `MISSIONCTRL_MODEL_NAME` can take hours.
 Expected reward curve still depends on capacity; see reward_model.py.
 
-Default curriculum total: 500 GRPO max_steps (150+200+150) on a single GPU,
+Default curriculum total: ~600 GRPO max_steps (200+220+180) on a single GPU,
 plus per-phase eval; allow extra time if a phase repeats (see MAX_PHASE_REPEATS).
 T4 (low VRAM): same step counts unless you set MISSIONCTRL_SMOKE_STEPS or
 MISSIONCTRL_T4_CURRICULUM — expect wall time much longer than A100 (often hours more).
@@ -62,7 +62,21 @@ import random
 import re
 import logging
 import inspect
+import warnings
 import torch
+
+# Quieter logs: Transformers 4.5x+ emits FutureWarning for internal masking helpers
+# (fixed in upstream TRL/transformers; not actionable in this repo).
+warnings.filterwarnings(
+    "ignore",
+    message=r".*masking_utils.*",
+    category=FutureWarning,
+)
+warnings.filterwarnings(
+    "ignore",
+    message=r".*Transformers v5\.10.*",
+    category=FutureWarning,
+)
 # Pre-bind torch submodules that some torch/unsloth_zoo builds (e.g. Kaggle's
 # torch 2.10.0+cu128) do not auto-load. Without these imports, importing
 # `unsloth` triggers `unsloth_zoo.temporary_patches.common` -> `torch._inductor`
@@ -129,15 +143,15 @@ MODEL_NAME      = os.environ.get(
 )
 MAX_SEQ_LEN     = 4096
 # Aligned with GRPOConfig.max_completion_length, evaluate() max_new_tokens, and FIX #22 prompt cap.
-# Default 64 for wall time; override: MISSIONCTRL_COMPLETION_MAX_TOKENS=96 or 128 if truncations.
+# Default 80 so reasoning + one action line fit small models; override via MISSIONCTRL_COMPLETION_MAX_TOKENS.
 COMPLETION_MAX_TOKENS = int(
-    os.environ.get("MISSIONCTRL_COMPLETION_MAX_TOKENS", "64").strip() or "64"
+    os.environ.get("MISSIONCTRL_COMPLETION_MAX_TOKENS", "80").strip() or "80"
 )
 # Council: start at 16; try 32 if a baseline run plateaus. Override: MISSIONCTRL_LORA_RANK
 LORA_RANK       = int(os.environ.get("MISSIONCTRL_LORA_RANK", "16"))
 BATCH_SIZE      = 4
 GRAD_ACCUM      = 4                             # effective batch = 16
-LEARNING_RATE   = 2e-5
+LEARNING_RATE   = float(os.environ.get("MISSIONCTRL_LEARNING_RATE", "2.5e-5"))
 NUM_GENERATIONS = 4                             # FIX #2: must be ≤ BATCH_SIZE (was 8, now 4)
 # Long Kaggle runs: reduce checkpoint I/O; override: MISSIONCTRL_SAVE_STEPS
 SAVE_STEPS      = int(os.environ.get("MISSIONCTRL_SAVE_STEPS", "200").strip() or "200")
@@ -176,36 +190,37 @@ except Exception:
 # FIX #13: easy phase now uses 3 tasks (consistent with documentation)
 try:
     if torch.cuda.is_available() and torch.cuda.device_count() >= 2:
-        # Kaggle: reduced steps for 9-hour session
+        # Kaggle: still time-capped, but easy needs enough GRPO steps to beat NOOP/parse-fail policies
         CURRICULUM = [
-            {"difficulty": "easy",   "num_tasks": 3, "steps": 100, "min_reward": 0.50, "target": 0.55},
-            {"difficulty": "medium", "num_tasks": 3, "steps": 150, "min_reward": 0.55, "target": 0.62},
-            {"difficulty": "hard",   "num_tasks": 4, "steps": 100, "min_reward": 0.65, "target": 0.72},
+            {"difficulty": "easy",   "num_tasks": 3, "steps": 160, "min_reward": 0.50, "target": 0.55},
+            {"difficulty": "medium", "num_tasks": 3, "steps": 160, "min_reward": 0.55, "target": 0.62},
+            {"difficulty": "hard",   "num_tasks": 4, "steps": 120, "min_reward": 0.65, "target": 0.72},
         ]
     else:
         # Single GPU / local fallback: full curriculum
         CURRICULUM = [
-            {"difficulty": "easy",   "num_tasks": 3, "steps": 150, "min_reward": 0.50, "target": 0.55},
-            {"difficulty": "medium", "num_tasks": 3, "steps": 200, "min_reward": 0.55, "target": 0.62},
-            {"difficulty": "hard",   "num_tasks": 4, "steps": 150, "min_reward": 0.65, "target": 0.72},
+            {"difficulty": "easy",   "num_tasks": 3, "steps": 200, "min_reward": 0.50, "target": 0.55},
+            {"difficulty": "medium", "num_tasks": 3, "steps": 220, "min_reward": 0.55, "target": 0.62},
+            {"difficulty": "hard",   "num_tasks": 4, "steps": 180, "min_reward": 0.65, "target": 0.72},
         ]
 except Exception:
     # Fallback: full curriculum
     CURRICULUM = [
-        {"difficulty": "easy",   "num_tasks": 3, "steps": 150, "min_reward": 0.50, "target": 0.55},
-        {"difficulty": "medium", "num_tasks": 3, "steps": 200, "min_reward": 0.55, "target": 0.62},
-        {"difficulty": "hard",   "num_tasks": 4, "steps": 150, "min_reward": 0.65, "target": 0.72},
+        {"difficulty": "easy",   "num_tasks": 3, "steps": 200, "min_reward": 0.50, "target": 0.55},
+        {"difficulty": "medium", "num_tasks": 3, "steps": 220, "min_reward": 0.55, "target": 0.62},
+        {"difficulty": "hard",   "num_tasks": 4, "steps": 180, "min_reward": 0.65, "target": 0.72},
     ]
-MAX_PHASE_REPEATS = 2   # repeat a phase up to this many times if threshold not met
+# Up to (MAX_PHASE_REPEATS + 1) attempts per phase (e.g. 2 here → attempts 1/3 … 3/3).
+MAX_PHASE_REPEATS = 2
 
 # Shorter curriculum for a single low-VRAM GPU — same idea as 2×GPU Kaggle table
 if os.environ.get("MISSIONCTRL_T4_CURRICULUM", "").strip().lower() in ("1", "true", "yes"):
     try:
         if not (torch.cuda.is_available() and torch.cuda.device_count() >= 2):
             CURRICULUM = [
-                {"difficulty": "easy",   "num_tasks": 3, "steps": 100, "min_reward": 0.50, "target": 0.55},
-                {"difficulty": "medium", "num_tasks": 3, "steps": 150, "min_reward": 0.55, "target": 0.62},
-                {"difficulty": "hard",   "num_tasks": 4, "steps": 100, "min_reward": 0.65, "target": 0.72},
+                {"difficulty": "easy",   "num_tasks": 3, "steps": 140, "min_reward": 0.50, "target": 0.55},
+                {"difficulty": "medium", "num_tasks": 3, "steps": 160, "min_reward": 0.55, "target": 0.62},
+                {"difficulty": "hard",   "num_tasks": 4, "steps": 120, "min_reward": 0.65, "target": 0.72},
             ]
     except Exception:
         pass
@@ -217,8 +232,8 @@ _DEFAULT_REPORT = os.environ.get("MISSIONCTRL_REPORT_TO", "none").strip() or "no
 
 
 def _phase_n_samples(phase_steps: int) -> int:
-    """Dataset size per phase: scales with step budget, min 200 (GRPO speedup: avoid 500 static rows)."""
-    return max(phase_steps * 4, 200)
+    """Dataset size per phase: scales with step budget, min 256 (enough diversity per GRPO epoch)."""
+    return max(phase_steps * 5, 256)
 
 
 # ── System Prompt ─────────────────────────────────────────────────────────────
@@ -287,7 +302,7 @@ def build_user_prompt(observation: dict) -> str:
 {messages}
 
 What is your next action? Respond with exactly ONE action from the available list.
-State your reasoning first (1-3 sentences with specific evidence), then your action on the final line."""
+State your reasoning first (1-3 sentences with specific evidence), then on the LAST line output ONLY the action (no quotes around the whole line), e.g. APPROVE(T001) or FLAG(T002, "brief evidence")."""
 
 
 # ── Dataset Generation ────────────────────────────────────────────────────────
@@ -695,7 +710,8 @@ def _extract_log_reward(logs: dict) -> float | None:
 class FlatRewardEarlyStopCallback(TrainerCallback):
     """
     If easy-phase (curriculum index 0) reward stops moving after `min_step`, end the phase early.
-    Mitigates wasting Kaggle runtime on a noisy/flat GRPO signal (council guidance).
+    Opt-in via MISSIONCTRL_EARLY_STOP_PHASE1=1: log-scale GRPO rewards can look "flat" while eval
+    is still improving, so this is off by default.
     """
 
     def __init__(
@@ -759,10 +775,14 @@ def train():
             phase_attempts += 1
             attempt_label = f"(attempt {phase_attempts}/{MAX_PHASE_REPEATS + 1})"
 
+            # Give retries extra GRPO budget — first failure is often under-training, not a bad seed only.
+            base_steps = int(phase["steps"])
+            effective_steps = base_steps if phase_attempts == 1 else int(base_steps * 1.4) + 24
+
             print(f"\n{'=' * 60}")
             print(
                 f"📚 Curriculum Phase {phase_idx + 1}/{len(curriculum)}: {phase['difficulty'].upper()} "
-                f"| {phase['num_tasks']} tasks | {phase['steps']} steps {attempt_label}"
+                f"| {phase['num_tasks']} tasks | {effective_steps} GRPO steps {attempt_label}"
             )
             print(f"{'=' * 60}")
 
@@ -770,30 +790,33 @@ def train():
             samples = generate_training_samples(
                 difficulty  = phase["difficulty"],
                 num_tasks   = phase["num_tasks"],
-                n_samples   = _phase_n_samples(phase["steps"]),
+                n_samples   = _phase_n_samples(effective_steps),
                 seed_start  = phase_idx * 1000 + phase_attempts * 100,
             )
             dataset = Dataset.from_list(samples)
 
             early_cb = FlatRewardEarlyStopCallback(
-                enabled=os.environ.get("MISSIONCTRL_EARLY_STOP_PHASE1", "1").strip().lower()
+                # Default off: "flat" GRPO log rewards often cut phase-1 short before min_reward eval improves.
+                enabled=os.environ.get("MISSIONCTRL_EARLY_STOP_PHASE1", "0").strip().lower()
                 in ("1", "true", "yes"),
                 phase_index=phase_idx,
                 min_step=int(os.environ.get("MISSIONCTRL_EARLY_STOP_MIN_STEPS", "75")),
                 log_window=int(os.environ.get("MISSIONCTRL_EARLY_STOP_LOG_WINDOW", "3")),
             )
 
+            _train_temp = float(os.environ.get("MISSIONCTRL_GRPO_TEMPERATURE", "0.55").strip() or "0.55")
+
             _grpo_kwargs = dict(
                 output_dir                  = f"{OUTPUT_DIR}/phase_{phase_idx + 1}_attempt_{phase_attempts}",
                 num_train_epochs            = 1,
-                max_steps                   = phase["steps"],
+                max_steps                   = effective_steps,
                 per_device_train_batch_size = BATCH_SIZE,
                 gradient_accumulation_steps = GRAD_ACCUM,
                 learning_rate               = LEARNING_RATE,
                 num_generations             = NUM_GENERATIONS,   # FIX #2: ≤ BATCH_SIZE
                 max_completion_length       = COMPLETION_MAX_TOKENS,
                 max_prompt_length           = MAX_SEQ_LEN - COMPLETION_MAX_TOKENS,  # FIX #22: lockstep with completion budget
-                temperature                 = 0.7,
+                temperature                 = _train_temp,
                 logging_steps               = 10,
                 save_steps                  = SAVE_STEPS,
                 report_to                   = _DEFAULT_REPORT,
