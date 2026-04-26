@@ -81,7 +81,7 @@ _INFERENCE_ENV_BASE_URL: str = ""
 # Optional failover chain (used when the active provider errors during inference).
 # Keep tokens empty in-repo; runtime secrets can still arrive from env / Spaces.
 _INFERENCE_FALLBACK_API_BASE_URL: str = "https://router.huggingface.co/v1"
-_INFERENCE_FALLBACK_MODEL_NAME: str = "llama-3.1-8b-instant"
+_INFERENCE_FALLBACK_MODEL_NAME: str = "meta-llama/Llama-3.1-8B-Instruct"
 _INFERENCE_FALLBACK_HF_TOKEN: str = ""
 
 _INFERENCE_FALLBACK2_API_BASE_URL: str = "https://api.groq.com/openai/v1"
