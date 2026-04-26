@@ -73,15 +73,15 @@ import logging as _logging
 # Non-empty values override `.env`, shell env, and CLI flags (see apply order below).
 # Leave as "" to use env / CLI only (e.g. empty HF_TOKEN in repo; Space injects at runtime).
 # =============================================================================
-_INFERENCE_API_BASE_URL: str = "https://xfb9waxafjtm3p05.us-east4.gcp.endpoints.huggingface.cloud"
-_INFERENCE_MODEL_NAME: str = "qwen"
+_INFERENCE_API_BASE_URL: str = "https://pfxsogmap6do11nx.us-east4.gcp.endpoints.huggingface.cloud"
+_INFERENCE_MODEL_NAME: str = "missionctrl-env-wnc"
 _INFERENCE_HF_TOKEN: str = ""
 _INFERENCE_ENV_BASE_URL: str = ""
 
 # Optional failover chain (used when the active provider errors during inference).
 # Keep tokens empty in-repo; runtime secrets can still arrive from env / Spaces.
-_INFERENCE_FALLBACK_API_BASE_URL: str = "https://router.huggingface.co/v1"
-_INFERENCE_FALLBACK_MODEL_NAME: str = "meta-llama/Llama-3.1-8B-Instruct"
+_INFERENCE_FALLBACK_API_BASE_URL: str = "https://xfb9waxafjtm3p05.us-east4.gcp.endpoints.huggingface.cloud"
+_INFERENCE_FALLBACK_MODEL_NAME: str = "quen"
 _INFERENCE_FALLBACK_HF_TOKEN: str = ""
 
 _INFERENCE_FALLBACK2_API_BASE_URL: str = "https://api.groq.com/openai/v1"

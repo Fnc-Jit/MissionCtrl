@@ -344,22 +344,34 @@ When `VERBOSE_TRACE=1`, inference prints compact boxed traces — prompt size, p
 | `TRACE_BOX_WIDTH` | `76` | Width of the boxed trace output |
 | `SPINNER_ENABLED` | `0` | CLI spinner while waiting for LLM response |
 
-### Inference test — deployed Qwen (HF dedicated Inference Endpoint)
+### Inference test — deployed trained model (HF dedicated Inference Endpoint)
 
 > ### 🧪 Deployed endpoint smoke test
 >
 > Team-hosted OpenAI-compatible endpoint for **`inference.py`** / **`client.py`** smoke runs (MissionCtrl server on `ENV_BASE_URL` as usual).
 >
+> ### 🧭 Inference priority order (`inference.py`)
+>
+> ```text
+> 1) Primary
+>    API_BASE_URL = https://pfxsogmap6do11nx.us-east4.gcp.endpoints.huggingface.cloud
+>    MODEL_NAME   = missionctrl-env-wnc
+>
+> 2) Fallback (hosted model)
+>    API_BASE_URL = https://xfb9waxafjtm3p05.us-east4.gcp.endpoints.huggingface.cloud
+>    MODEL_NAME   = quen
+> ```
+>
 > | Setting | Value |
 > |---|---|
-> | **`API_BASE_URL`** | `https://xfb9waxafjtm3p05.us-east4.gcp.endpoints.huggingface.cloud` |
-> | **`MODEL_NAME`** | `quen` |
+> | **`API_BASE_URL`** | `https://pfxsogmap6do11nx.us-east4.gcp.endpoints.huggingface.cloud` |
+> | **`MODEL_NAME`** | `missionctrl-env-wnc` |
 >
 > `inference.py` normalizes dedicated HF URLs to end with **`/v1`** for the OpenAI client when the host matches `*.endpoints.huggingface.cloud`.
 >
 > ```bash
-> export API_BASE_URL="https://xfb9waxafjtm3p05.us-east4.gcp.endpoints.huggingface.cloud"
-> export MODEL_NAME="quen"
+> export API_BASE_URL="https://pfxsogmap6do11nx.us-east4.gcp.endpoints.huggingface.cloud"
+> export MODEL_NAME="missionctrl-env-wnc"
 > export HF_TOKEN="hf_..."   # token must be allowed to infer on this endpoint (scope / org role)
 > export ENV_BASE_URL="http://localhost:7860"
 > python inference.py
