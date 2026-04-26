@@ -40,11 +40,19 @@ if "openai" not in sys.modules:
             self.body = body
             self.status_code = getattr(response, "status_code", None) if response is not None else None
 
+    class AuthenticationError(Exception):
+        """Stub for openai.AuthenticationError."""
+
+    class PermissionDeniedError(Exception):
+        """Stub for openai.PermissionDeniedError."""
+
     class _OpenAIStub:
         def __init__(self, *args, **kwargs):
             pass
 
     openai_stub.BadRequestError = BadRequestError
+    openai_stub.AuthenticationError = AuthenticationError
+    openai_stub.PermissionDeniedError = PermissionDeniedError
     openai_stub.OpenAI = _OpenAIStub
     sys.modules["openai"] = openai_stub
 

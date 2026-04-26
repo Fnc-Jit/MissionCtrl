@@ -1,17 +1,36 @@
 """Mandatory baseline evaluation script for the OpenEnv Hackathon.
 
 Runs an LLM agent against the MissionCtrl environment through /reset and /step.
-Uses the `openai` SDK and the following MANDATORY environment variables:
+Uses the `openai` SDK. Configure the LLM in one of these ways (later steps override earlier):
 
-  API_BASE_URL  — The API endpoint for the LLM (OpenAI-compatible).
-  MODEL_NAME    — The model identifier to use for inference.
-  HF_TOKEN      — Your Hugging Face / API key.
+1. **Environment variables** (and optional `.env` via `load_dotenv()`).
+2. **Optional CLI flags** (`--api-base-url`, …).
+3. **Inline variable box** in this file — non-empty strings override both `.env` and CLI
+   (best for pasting key/URL directly when pushing without secrets in env files).
 
-Quick-start:
+  API_BASE_URL  — OpenAI-compatible LLM base URL.
+  MODEL_NAME    — Model id for that host.
+  HF_TOKEN      — API key (`hf_...`, `gsk_...`, etc.). May be empty at image build time;
+                  Hugging Face Spaces often inject it at runtime via Secrets → Environment.
+
+Quick-start (shell env):
   export API_BASE_URL=https://router.huggingface.co/v1
   export MODEL_NAME=openai/gpt-oss-120b
   export HF_TOKEN=hf_xxxxx
   python inference.py
+
+Quick-start (CLI only, no .env):
+  python inference.py \\
+    --api-base-url https://api.groq.com/openai/v1 \\
+    --model-name llama-3.3-70b-versatile \\
+    --hf-token gsk_xxxxx \\
+    --env-base-url http://localhost:7860
+
+Quick-start (inline variable box — edit the ``_INFERENCE_*`` strings near the top of this file):
+  _INFERENCE_API_BASE_URL = "https://api.groq.com/openai/v1"
+  _INFERENCE_MODEL_NAME = "llama-3.3-70b-versatile"
+  _INFERENCE_HF_TOKEN = "gsk_xxxxx"
+  _INFERENCE_ENV_BASE_URL = "http://localhost:7860"
 
 Hugging Face dedicated Inference Endpoints (`*.endpoints.huggingface.cloud`):
   - `API_BASE_URL` is normalized to end with `/v1` for OpenAI-compatible chat.
@@ -37,13 +56,99 @@ from typing import Any, Dict, List, Optional, Tuple
 import httpx
 from dotenv import load_dotenv
 from openai import BadRequestError, OpenAI
+
+try:
+    from openai import AuthenticationError, PermissionDeniedError
+except ImportError:  # pragma: no cover — very old SDK stubs
+    class AuthenticationError(Exception):
+        """Fallback when openai.AuthenticationError is unavailable."""
+
+    class PermissionDeniedError(Exception):
+        """Fallback when openai.PermissionDeniedError is unavailable."""
 from tenacity import retry, stop_after_attempt, wait_exponential, before_sleep_log, retry_if_not_exception_type
 import logging as _logging
 
+# =============================================================================
+# INLINE CONFIG — paste API URL, model id, key, and env server URL here.
+# Non-empty values override `.env`, shell env, and CLI flags (see apply order below).
+# Leave as "" to use env / CLI only (e.g. empty HF_TOKEN in repo; Space injects at runtime).
+# =============================================================================
+_INFERENCE_API_BASE_URL: str = "https://xfb9waxafjtm3p05.us-east4.gcp.endpoints.huggingface.cloud"
+_INFERENCE_MODEL_NAME: str = "qwen"
+_INFERENCE_HF_TOKEN: str = ""
+_INFERENCE_ENV_BASE_URL: str = ""
+
 # ---------------------------------------------------------------------------
-# Load .env file automatically (so no manual `export` needed)
+# Optional .env (skipped if file missing), then CLI, then inline box → os.environ.
 # ---------------------------------------------------------------------------
 load_dotenv()
+
+
+def _apply_inference_cli_overrides() -> None:
+    """Parse optional `--api-base-url`, `--model-name`, `--hf-token`, `--env-base-url`.
+
+    Merges into ``os.environ`` before module-level config reads. Uses ``parse_known_args``
+    so pytest or other wrappers can import this module without consuming their argv.
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="MissionCtrl inference — optional LLM/env overrides.",
+        add_help=True,
+    )
+    parser.add_argument(
+        "--api-base-url",
+        dest="api_base_url",
+        default=None,
+        metavar="URL",
+        help="Sets API_BASE_URL (OpenAI-compatible base, often ends with /v1).",
+    )
+    parser.add_argument(
+        "--model-name",
+        dest="model_name",
+        default=None,
+        metavar="ID",
+        help="Sets MODEL_NAME.",
+    )
+    parser.add_argument(
+        "--hf-token",
+        dest="hf_token",
+        default=None,
+        metavar="KEY",
+        help="Sets HF_TOKEN. May be empty; use Space secrets at runtime on Hugging Face.",
+    )
+    parser.add_argument(
+        "--env-base-url",
+        dest="env_base_url",
+        default=None,
+        metavar="URL",
+        help="Sets ENV_BASE_URL (MissionCtrl FastAPI server).",
+    )
+    known, _rest = parser.parse_known_args()
+    if known.api_base_url is not None:
+        os.environ["API_BASE_URL"] = known.api_base_url
+    if known.model_name is not None:
+        os.environ["MODEL_NAME"] = known.model_name
+    if known.hf_token is not None:
+        os.environ["HF_TOKEN"] = known.hf_token
+    if known.env_base_url is not None:
+        os.environ["ENV_BASE_URL"] = known.env_base_url
+
+
+def _apply_inference_inline_config() -> None:
+    """Copy non-empty `_INFERENCE_*` module strings into ``os.environ`` (highest priority)."""
+    if _INFERENCE_API_BASE_URL.strip():
+        os.environ["API_BASE_URL"] = _INFERENCE_API_BASE_URL.strip()
+    if _INFERENCE_MODEL_NAME.strip():
+        os.environ["MODEL_NAME"] = _INFERENCE_MODEL_NAME.strip()
+    if _INFERENCE_HF_TOKEN.strip():
+        os.environ["HF_TOKEN"] = _INFERENCE_HF_TOKEN.strip()
+    if _INFERENCE_ENV_BASE_URL.strip():
+        os.environ["ENV_BASE_URL"] = _INFERENCE_ENV_BASE_URL.strip()
+
+
+_apply_inference_cli_overrides()
+_apply_inference_inline_config()
 
 
 def _is_hf_dedicated_endpoint(base_url: str) -> bool:
@@ -95,14 +200,19 @@ def _clamp_score(val: float) -> float:
 
 def _validate_env() -> None:
     if not API_BASE_URL:
-        print("\n  ❌ ERROR: API_BASE_URL is not set.")
+        print("\n  ❌ ERROR: API_BASE_URL is not set.", file=sys.stderr)
+        print("     Set env API_BASE_URL, CLI --api-base-url, or _INFERENCE_API_BASE_URL in this file.", file=sys.stderr)
         sys.exit(1)
     if not MODEL_NAME:
-        print("\n  ❌ ERROR: MODEL_NAME is not set.")
+        print("\n  ❌ ERROR: MODEL_NAME is not set.", file=sys.stderr)
+        print("     Set env MODEL_NAME, CLI --model-name, or _INFERENCE_MODEL_NAME in this file.", file=sys.stderr)
         sys.exit(1)
     if not HF_TOKEN:
-        print("\n  ❌ ERROR: HF_TOKEN is not set.")
-        sys.exit(1)
+        print(
+            "\n  ⚠ WARNING: HF_TOKEN is empty — LLM requests will fail unless the "
+            "runtime injects a key (e.g. HF Space Secret → HF_TOKEN).",
+            file=sys.stderr,
+        )
 
 
 _validate_env()
@@ -204,6 +314,10 @@ _MODEL_OR_AUTH_DENY_SUBSTR: Tuple[str, ...] = (
     "authentication",
     "unauthorized",
     "permission denied",
+    "permissiondenied",
+    "forbidden",
+    "inference.endpoints",
+    "missing permissions",
     "access denied",
     "model is required",
 )
@@ -1321,7 +1435,23 @@ def _call_llm(messages: List[Dict[str, str]]) -> str:
     """Call the LLM and return raw action string."""
     provider = _llm_provider_kind(API_BASE_URL)
     if provider == _LlmProviderKind.HF_DEDICATED and _HF_LLM_STRATEGY in {"native_only", "native"}:
-        return _call_hf_native_text_generation(messages)
+        try:
+            return _call_hf_native_text_generation(messages)
+        except Exception as exc:
+            if isinstance(exc, (PermissionDeniedError, AuthenticationError)):
+                raise LlmConfigurationError(
+                    "LLM permission or authentication failed (will not retry). "
+                    "For Hugging Face Inference Endpoints, use a token whose role includes "
+                    "inference on this endpoint (error often mentions `inference.endpoints.infer.write`). "
+                    f"MODEL_NAME={MODEL_NAME!r} API_BASE_URL={API_BASE_URL!r} — {_short_exc(exc)}"
+                ) from exc
+            st = _openai_http_status(exc)
+            if st in (401, 403):
+                raise LlmConfigurationError(
+                    "LLM HTTP 401/403 (will not retry). Check API key and provider permissions "
+                    f"(HF: endpoint access / org role). MODEL_NAME={MODEL_NAME!r} — {_short_exc(exc)}"
+                ) from exc
+            raise
 
     try:
         return _call_openai_chat(messages)
@@ -1330,6 +1460,21 @@ def _call_llm(messages: List[Dict[str, str]]) -> str:
         lower_msg = msg.lower()
         blob = _openai_error_blob(exc)
         lower_blob = blob.lower()
+
+        # Auth / IAM — never worth exponential retry (403 token scope, wrong key, etc.).
+        if isinstance(exc, (PermissionDeniedError, AuthenticationError)):
+            raise LlmConfigurationError(
+                "LLM permission or authentication failed (will not retry). "
+                "For Hugging Face Inference Endpoints, use a token whose role includes "
+                "inference on this endpoint (error often mentions `inference.endpoints.infer.write`). "
+                f"MODEL_NAME={MODEL_NAME!r} API_BASE_URL={API_BASE_URL!r} — {_short_exc(exc)}"
+            ) from exc
+        st = _openai_http_status(exc)
+        if st in (401, 403):
+            raise LlmConfigurationError(
+                "LLM HTTP 401/403 (will not retry). Check API key and provider permissions "
+                f"(HF: endpoint access / org role). MODEL_NAME={MODEL_NAME!r} — {_short_exc(exc)}"
+            ) from exc
 
         if _llm_error_indicates_model_auth_or_size(lower_blob):
             raise LlmConfigurationError(
@@ -1672,7 +1817,12 @@ def run_task(task_id: str, policy_memory: PolicyMemory) -> float:
 # ---------------------------------------------------------------------------
 def main() -> None:
     start_time = time.time()
-    masked_key = ('*' * 4 + HF_TOKEN[-4:]) if len(HF_TOKEN) > 4 else '****'
+    if len(HF_TOKEN) > 4:
+        masked_key = "*" * 4 + HF_TOKEN[-4:]
+    elif HF_TOKEN:
+        masked_key = "****"
+    else:
+        masked_key = "(empty)"
 
     print("=" * 60, file=sys.stderr)
     print("  MissionCtrl Baseline Evaluator", file=sys.stderr)

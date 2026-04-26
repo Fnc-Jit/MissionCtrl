@@ -24,12 +24,13 @@ tags:
 
 ### 🔗 Links
 
-| Resource | URL |
-|---|---|
-| 🤗 **Hugging Face Space (Environment)** | _coming soon_ <!-- TODO: paste HF Space URL --> |
-| 📓 **Training Notebook (Kaggle 2×T4)** | _coming soon_ <!-- TODO: paste Kaggle notebook URL --> |
-| 🎞️ **Presentation Slides** | _coming soon_ <!-- TODO: paste slides URL --> |
-| 📝 **Story / Blog post** | [`blog.md`](blog.md) |
+- 📈 **Training runs (logs + screenshots):** [Training-logs.md](Training-logs.md) — append GRPO/Kaggle stderr, curves, and captures; see **§11 → Training logbook** above.
+- 📝 **Story / build blog:** [blog.md](blog.md) — the narrative arc from confusion to overseer, including the error-collection log.
+- 🤗 **HF Space (environment):** [huggingface.co/spaces/Jit-fnc/missionctrl_env](https://huggingface.co/spaces/Jit-fnc/missionctrl_env)
+- 📓 **Google Colab notebook:** [Open in Colab](https://colab.research.google.com/github/Fnc-Jit/MissionCtrl/blob/main/google_colab.ipynb)
+- 🎞️ **Slides:** [tr.ee/V6kf1l](https://tr.ee/V6kf1l)
+- 🤗 **HF base model (legacy / training):** [Qwen2.5-0.5B-Instruct (Unsloth 4-bit)](https://huggingface.co/unsloth/Qwen2.5-0.5B-Instruct-unsloth-bnb-4bit)
+- 🤗 **HF trained adapter:** _coming soon_ <!-- TODO -->
 
 ---
 
@@ -334,6 +335,27 @@ When `VERBOSE_TRACE=1`, inference prints compact boxed traces — prompt size, p
 | `TRACE_BOX_WIDTH` | `76` | Width of the boxed trace output |
 | `SPINNER_ENABLED` | `0` | CLI spinner while waiting for LLM response |
 
+### Inference test — deployed Qwen (HF dedicated Inference Endpoint)
+
+Team-hosted OpenAI-compatible endpoint for **`inference.py`** / **`client.py`** smoke runs (MissionCtrl server on `ENV_BASE_URL` as usual):
+
+| Setting | Value |
+|---|---|
+| **`API_BASE_URL`** | `https://xfb9waxafjtm3p05.us-east4.gcp.endpoints.huggingface.cloud` |
+| **`MODEL_NAME`** | `quen` |
+
+`inference.py` normalizes dedicated HF URLs to end with **`/v1`** for the OpenAI client when the host matches `*.endpoints.huggingface.cloud`.
+
+```bash
+export API_BASE_URL="https://xfb9waxafjtm3p05.us-east4.gcp.endpoints.huggingface.cloud"
+export MODEL_NAME="quen"
+export HF_TOKEN="hf_..."   # token must be allowed to infer on this endpoint (scope / org role)
+export ENV_BASE_URL="http://localhost:7860"
+python inference.py
+```
+
+Same values can be pasted into the **`_INFERENCE_*` inline box** at the top of `inference.py` if you prefer not to use shell env or `.env`. If the API returns **403** / `inference.endpoints.infer.write`, the token does not have infer permission on that deployment — use a fine-grained or org token with endpoint access.
+
 ### GRPO / LoRA training (optional)
 
 | Variable | Default | Description |
@@ -444,6 +466,12 @@ Quick reward-function smoke (no GPU needed):
 python train.py --reward-smoke
 ```
 
+### Training logbook (`Training-logs.md`)
+
+Curated **GRPO / Kaggle** run notes live in **[`Training-logs.md`](Training-logs.md)** — paste **markdown** summaries, **verbatim stderr / trainer logs**, and **screenshots** (reward curves, phase tables, dashboard captures) there so the README stays short while the repo still tells a full training story.
+
+When you finish a notable run, append a dated subsection to `Training-logs.md` and link any images under `Asset/` (or a dedicated `Asset/training/` folder if you add one).
+
 ---
 
 ## 12. Troubleshooting
@@ -467,10 +495,39 @@ Newer Kaggle torch builds (e.g. `2.10.x`) need a pre-import shim — `train.py` 
 
 ## 13. Read more
 
-- 📝 **Story / build blog:** [`blog.md`](blog.md) — the narrative arc from confusion to overseer, including the error-collection log.
-- 🤗 **HF Space (env):** _coming soon_ <!-- TODO -->
-- 📓 **Kaggle training notebook:** _coming soon_ <!-- TODO -->
-- 🎞️ **Slides:** _coming soon_ <!-- TODO -->
+- 📈 **Training runs (logs + screenshots):** [Training-logs.md](Training-logs.md) — append GRPO/Kaggle stderr, curves, and captures; see **§11 → Training logbook** above.
+- 📝 **Story / build blog:** [blog.md](blog.md) — the narrative arc from confusion to overseer, including the error-collection log.
+- 🤗 **HF Space (environment):** [huggingface.co/spaces/Jit-fnc/missionctrl_env](https://huggingface.co/spaces/Jit-fnc/missionctrl_env)
+- 📓 **Google Colab notebook:** [Open in Colab](https://colab.research.google.com/github/Fnc-Jit/MissionCtrl/blob/main/google_colab.ipynb)
+- 🎞️ **Slides:** [tr.ee/V6kf1l](https://tr.ee/V6kf1l)
+- 🤗 **HF base model (legacy / training):** [Qwen2.5-0.5B-Instruct (Unsloth 4-bit)](https://huggingface.co/unsloth/Qwen2.5-0.5B-Instruct-unsloth-bnb-4bit)
+- 🤗 **HF trained adapter:** _coming soon_ <!-- TODO -->
+
+---
+
+## 14. Future spec and improvements
+
+Roadmap items we care about next — not promises, but the direction the codebase and experiments are pointing.
+
+### Training and evaluation
+
+- **Full-policy GRPO reward:** today the reward rollout applies the model’s **first** completion, then a **greedy script** to finish the episode. A fuller spec is **every step from the policy** (or a short learned completion policy) so train and eval optimize the same object.
+- **Train / eval alignment:** tighten the gap between **logged GRPO reward** and **greedy multi-step eval** (curriculum gates, more eval episodes per phase, or auxiliary losses) so “reward up, eval flat” is rarer and shorter-lived.
+- **Larger bases + longer curriculum:** validate the **~3B + full curriculum** trajectory past the **~0.65** mean-score target; keep Kaggle-friendly step budgets documented per GPU class.
+
+### Environment and product
+
+- **Multi-session API:** optional **session id** on `/reset` and `/step` for concurrent evaluators without sharing one global engine process (today the server uses a **singleton** env by design).
+- **Root vs `server/` parity:** continue to align task banks, IDs, and edge cases so `MissionCtrlEnv` (training) and `MissionCtrlEngine` (HTTP) stay behaviorally equivalent where the spec demands it.
+- **Live judge in the loop:** optional **API-backed** `signal_llm_judge` during training runs (cost-controlled) instead of mock-only, for harder evidence-quality signal.
+
+### Ops and UX
+
+- **HF Space / Docker:** fill in the **Space URL** in the links table when published; add a **one-click eval** badge or script that pins `ENV_BASE_URL` + `API_BASE_URL` for reviewers.
+- **Observability:** richer **export** of episode traces (JSON bundle per tier) for post-mortems and paper-style benchmarks.
+- **Inference UX:** extend the **inline config box** / env docs with provider-specific examples (Groq, dedicated HF endpoints, router) without committing secrets.
+
+Contributions aligned with any of the above are welcome; open an issue or PR with a short design note if the change touches the reward contract or API surface.
 
 ---
 
