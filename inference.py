@@ -78,6 +78,16 @@ _INFERENCE_MODEL_NAME: str = "qwen"
 _INFERENCE_HF_TOKEN: str = ""
 _INFERENCE_ENV_BASE_URL: str = ""
 
+# Optional failover chain (used when the active provider errors during inference).
+# Keep tokens empty in-repo; runtime secrets can still arrive from env / Spaces.
+_INFERENCE_FALLBACK_API_BASE_URL: str = "https://router.huggingface.co/v1"
+_INFERENCE_FALLBACK_MODEL_NAME: str = "llama-3.1-8b-instant"
+_INFERENCE_FALLBACK_HF_TOKEN: str = ""
+
+_INFERENCE_FALLBACK2_API_BASE_URL: str = "https://api.groq.com/openai/v1"
+_INFERENCE_FALLBACK2_MODEL_NAME: str = "llama-3.1-8b-instant"
+_INFERENCE_FALLBACK2_HF_TOKEN: str = ""
+
 # ---------------------------------------------------------------------------
 # Optional .env (skipped if file missing), then CLI, then inline box → os.environ.
 # ---------------------------------------------------------------------------
@@ -227,6 +237,80 @@ TRACE_WRAP_WIDTH: int = int(os.environ.get("TRACE_WRAP_WIDTH", "76"))
 TRACE_BOX_WIDTH: int = int(os.environ.get("TRACE_BOX_WIDTH", "76"))
 SPINNER_ENABLED: bool = os.environ.get("SPINNER_ENABLED", "0").strip().lower() in {"1", "true", "yes"}
 _retry_logger = _logging.getLogger("missionctrl.retry")
+
+
+@dataclass(frozen=True)
+class _LlmEndpoint:
+    label: str
+    api_base_url: str
+    model_name: str
+    hf_token: str
+
+
+def _build_failover_chain() -> List[_LlmEndpoint]:
+    """Primary endpoint first, then configured backup endpoints."""
+    candidates: List[_LlmEndpoint] = [
+        _LlmEndpoint(
+            label="primary",
+            api_base_url=API_BASE_URL,
+            model_name=MODEL_NAME,
+            hf_token=HF_TOKEN,
+        ),
+        _LlmEndpoint(
+            label="fallback_groq",
+            api_base_url=_normalize_openai_api_base_url(_INFERENCE_FALLBACK_API_BASE_URL.strip()),
+            model_name=_INFERENCE_FALLBACK_MODEL_NAME.strip(),
+            hf_token=(_INFERENCE_FALLBACK_HF_TOKEN or HF_TOKEN).strip(),
+        ),
+        _LlmEndpoint(
+            label="fallback_hf_router",
+            api_base_url=_normalize_openai_api_base_url(_INFERENCE_FALLBACK2_API_BASE_URL.strip()),
+            model_name=_INFERENCE_FALLBACK2_MODEL_NAME.strip(),
+            hf_token=(_INFERENCE_FALLBACK2_HF_TOKEN or HF_TOKEN).strip(),
+        ),
+    ]
+
+    deduped: List[_LlmEndpoint] = []
+    seen: set[Tuple[str, str, str]] = set()
+    for cand in candidates:
+        if not cand.api_base_url or not cand.model_name:
+            continue
+        key = (cand.api_base_url, cand.model_name, cand.hf_token)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(cand)
+    return deduped
+
+
+_FAILOVER_CHAIN: List[_LlmEndpoint] = _build_failover_chain()
+_ACTIVE_FAILOVER_INDEX: int = 0
+
+
+def _activate_failover_endpoint(next_index: int, reason: str) -> None:
+    """Switch global LLM config/client to the selected failover endpoint."""
+    global API_BASE_URL, MODEL_NAME, HF_TOKEN, client, _ACTIVE_FAILOVER_INDEX
+    endpoint = _FAILOVER_CHAIN[next_index]
+    API_BASE_URL = _normalize_openai_api_base_url(endpoint.api_base_url)
+    MODEL_NAME = endpoint.model_name
+    HF_TOKEN = endpoint.hf_token
+    client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
+    _ACTIVE_FAILOVER_INDEX = next_index
+    print(
+        f"  ↪ LLM failover -> {endpoint.label} "
+        f"(model={MODEL_NAME}, base={API_BASE_URL}) | reason: {reason}",
+        file=sys.stderr,
+        flush=True,
+    )
+
+
+def _try_advance_failover(last_exc: Exception) -> bool:
+    """Move to the next endpoint in chain; returns True if switched."""
+    next_index = _ACTIVE_FAILOVER_INDEX + 1
+    if next_index >= len(_FAILOVER_CHAIN):
+        return False
+    _activate_failover_endpoint(next_index, _short_exc(last_exc, limit=220))
+    return True
 
 
 class PromptTooLargeError(RuntimeError):
@@ -1674,9 +1758,23 @@ def run_task(task_id: str, policy_memory: PolicyMemory) -> float:
                 if STEP_DELAY_S > 0:
                     time.sleep(STEP_DELAY_S)
             except Exception as exc:
-                short = str(exc).splitlines()[0][:120]
-                print(f"  [LLM Error] {short} → NOOP", file=sys.stderr)
-                raw_action = "NOOP"
+                short = str(exc).splitlines()[0][:160]
+                if _try_advance_failover(exc):
+                    try:
+                        with _spinner("🔁 Retrying on fallback LLM"):
+                            raw_action = _call_llm(messages)
+                        if STEP_DELAY_S > 0:
+                            time.sleep(STEP_DELAY_S)
+                    except Exception as retry_exc:
+                        retry_short = str(retry_exc).splitlines()[0][:160]
+                        print(
+                            f"  [LLM Error] {short} | fallback failed: {retry_short} → NOOP",
+                            file=sys.stderr,
+                        )
+                        raw_action = "NOOP"
+                else:
+                    print(f"  [LLM Error] {short} → NOOP", file=sys.stderr)
+                    raw_action = "NOOP"
 
             playbook_action = _playbook_action(obs, episode_memory, task_tier=task_id)
             safe_action = playbook_action or _normalize_action(raw_action, obs, episode_memory, task_tier=task_id)

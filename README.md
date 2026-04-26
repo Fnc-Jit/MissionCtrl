@@ -346,22 +346,24 @@ When `VERBOSE_TRACE=1`, inference prints compact boxed traces — prompt size, p
 
 ### Inference test — deployed Qwen (HF dedicated Inference Endpoint)
 
-Team-hosted OpenAI-compatible endpoint for **`inference.py`** / **`client.py`** smoke runs (MissionCtrl server on `ENV_BASE_URL` as usual):
-
-| Setting | Value |
-|---|---|
-| **`API_BASE_URL`** | `https://xfb9waxafjtm3p05.us-east4.gcp.endpoints.huggingface.cloud` |
-| **`MODEL_NAME`** | `quen` |
-
-`inference.py` normalizes dedicated HF URLs to end with **`/v1`** for the OpenAI client when the host matches `*.endpoints.huggingface.cloud`.
-
-```bash
-export API_BASE_URL="https://xfb9waxafjtm3p05.us-east4.gcp.endpoints.huggingface.cloud"
-export MODEL_NAME="quen"
-export HF_TOKEN="hf_..."   # token must be allowed to infer on this endpoint (scope / org role)
-export ENV_BASE_URL="http://localhost:7860"
-python inference.py
-```
+> ### 🧪 Deployed endpoint smoke test
+>
+> Team-hosted OpenAI-compatible endpoint for **`inference.py`** / **`client.py`** smoke runs (MissionCtrl server on `ENV_BASE_URL` as usual).
+>
+> | Setting | Value |
+> |---|---|
+> | **`API_BASE_URL`** | `https://xfb9waxafjtm3p05.us-east4.gcp.endpoints.huggingface.cloud` |
+> | **`MODEL_NAME`** | `quen` |
+>
+> `inference.py` normalizes dedicated HF URLs to end with **`/v1`** for the OpenAI client when the host matches `*.endpoints.huggingface.cloud`.
+>
+> ```bash
+> export API_BASE_URL="https://xfb9waxafjtm3p05.us-east4.gcp.endpoints.huggingface.cloud"
+> export MODEL_NAME="quen"
+> export HF_TOKEN="hf_..."   # token must be allowed to infer on this endpoint (scope / org role)
+> export ENV_BASE_URL="http://localhost:7860"
+> python inference.py
+> ```
 
 Same values can be pasted into the **`_INFERENCE_*` inline box** at the top of `inference.py` if you prefer not to use shell env or `.env`. If the API returns **403** / `inference.endpoints.infer.write`, the token does not have infer permission on that deployment — use a fine-grained or org token with endpoint access.
 
