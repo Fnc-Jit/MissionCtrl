@@ -284,7 +284,7 @@ That is the supervision layer enterprises will need as **agent fleets become the
 
 ### Try it
 
-> ### 🔗 Quick links
+> ### 🔗 Links
 >
 > - **🤗 HF Space (environment server):** [huggingface.co/spaces/Jit-fnc/missionctrl_env](https://huggingface.co/spaces/Jit-fnc/missionctrl_env)
 > - **📓 Colab starter:** [Open `google_colab.ipynb` in Colab](https://colab.research.google.com/github/Fnc-Jit/MissionCtrl/blob/main/google_colab.ipynb)

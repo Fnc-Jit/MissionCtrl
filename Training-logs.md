@@ -1,9 +1,9 @@
 # Training logs — MissionCtrl GRPO curriculum
 
-> ### 📓 View the notebook (full book output)
+> ### 🔗 Links
 >
-> - **In this repo:** [Traininglogs.ipynb](Traininglogs.ipynb)
-> - **In the browser (GitHub, saved outputs):** [github.com/Fnc-Jit/MissionCtrl/blob/main/Traininglogs.ipynb](https://github.com/Fnc-Jit/MissionCtrl/blob/main/Traininglogs.ipynb)
+> - 📓 **Training notebook (saved outputs):** [Traininglogs.ipynb](Traininglogs.ipynb)
+> - 🌐 **Notebook on GitHub (rendered outputs):** [github.com/Fnc-Jit/MissionCtrl/blob/main/Traininglogs.ipynb](https://github.com/Fnc-Jit/MissionCtrl/blob/main/Traininglogs.ipynb)
 
 This page is the **canonical training summary** for the run captured in **`Traininglogs.ipynb`** (exported Colab session). Numbers below are **verbatim from that notebook’s stdout/stderr**, not re-estimated.
 

@@ -31,8 +31,7 @@ tags:
 > - 📓 **Google Colab notebook:** [Open in Colab](https://colab.research.google.com/github/Fnc-Jit/MissionCtrl/blob/main/google_colab.ipynb)
 > - 🎞️ **Slides:** [tr.ee/V6kf1l](https://tr.ee/V6kf1l)
 > - 🤗 **HF base model (legacy / training):** [Qwen2.5-0.5B-Instruct (Unsloth 4-bit)](https://huggingface.co/unsloth/Qwen2.5-0.5B-Instruct-unsloth-bnb-4bit)
-> - 🤗 **HF trained adapter:**
->   > [huggingface.co/Jit-fnc/missionctrl_env](https://huggingface.co/Jit-fnc/missionctrl_env)
+> - 🤗 **HF trained adapter:** [huggingface.co/Jit-fnc/missionctrl_env](https://huggingface.co/Jit-fnc/missionctrl_env)
 
 ---
 
@@ -505,16 +504,16 @@ Newer Kaggle torch builds (e.g. `2.10.x`) need a pre-import shim — `train.py` 
 
 ## 13. Read more
 
-> **Quick links** (same list as the **🔗 Links** callout at the top of this README):
+> ### 🔗 Links
 >
+> - 📓 **Training notebook (saved cell outputs):** [Traininglogs.ipynb](Traininglogs.ipynb) — full executed logbook in-repo; on GitHub open [Traininglogs.ipynb on `main`](https://github.com/Fnc-Jit/MissionCtrl/blob/main/Traininglogs.ipynb) to scroll stdout, tables, and plots without re-running.
 > - 📈 **Training runs (logs + screenshots):** [Training-logs.md](Training-logs.md) — append GRPO/Kaggle stderr, curves, and captures; see **§11 → Training logbook** above.
 > - 📝 **Story / build blog:** [blog.md](blog.md) — the narrative arc from confusion to overseer, including the error-collection log.
 > - 🤗 **HF Space (environment):** [huggingface.co/spaces/Jit-fnc/missionctrl_env](https://huggingface.co/spaces/Jit-fnc/missionctrl_env)
 > - 📓 **Google Colab notebook:** [Open in Colab](https://colab.research.google.com/github/Fnc-Jit/MissionCtrl/blob/main/google_colab.ipynb)
 > - 🎞️ **Slides:** [tr.ee/V6kf1l](https://tr.ee/V6kf1l)
 > - 🤗 **HF base model (legacy / training):** [Qwen2.5-0.5B-Instruct (Unsloth 4-bit)](https://huggingface.co/unsloth/Qwen2.5-0.5B-Instruct-unsloth-bnb-4bit)
-> - 🤗 **HF trained adapter:**
->   > [huggingface.co/Jit-fnc/missionctrl_env](https://huggingface.co/Jit-fnc/missionctrl_env)
+> - 🤗 **HF trained adapter:** [huggingface.co/Jit-fnc/missionctrl_env](https://huggingface.co/Jit-fnc/missionctrl_env)
 
 ---
 
