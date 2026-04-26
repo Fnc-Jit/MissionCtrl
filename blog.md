@@ -2,11 +2,16 @@
 
 **Subtitle:** The story of MissionCtrl — a hackathon project born from a real problem in the age of agent fleets.
 
-> **Links**
-> - 🤗 Hugging Face Space: _coming soon_ — <!-- TODO: paste HF Space URL -->
-> - 🤗 Hugging Face Model: _coming soon_ — <!-- TODO: paste HF Space URL -->
-> - 📓 Training Notebook (Kaggle): _coming soon_ — <!-- TODO: paste Kaggle notebook URL -->
-> - 🎞️ Presentation Slides: _coming soon_ — <!-- TODO: paste slides URL -->
+> ### 🔗 Links
+>
+> - 📓 **Training notebook (saved outputs):** [Traininglogs.ipynb](Traininglogs.ipynb) — executed cells; [open on GitHub](https://github.com/Fnc-Jit/MissionCtrl/blob/main/Traininglogs.ipynb) to read the full book output in the browser.
+> - 🤗 **HF Space (environment):** [huggingface.co/spaces/Jit-fnc/missionctrl_env](https://huggingface.co/spaces/Jit-fnc/missionctrl_env)
+> - 🤗 **HF trained adapter:** [huggingface.co/Jit-fnc/missionctrl_env](https://huggingface.co/Jit-fnc/missionctrl_env)
+> - 🤗 **HF base model (legacy):** [Qwen2.5-0.5B-Instruct (Unsloth 4-bit)](https://huggingface.co/unsloth/Qwen2.5-0.5B-Instruct-unsloth-bnb-4bit)
+> - 📝 **Story / blog post:** [blog.md](blog.md)
+> - 📝 **Training logs:** [Training-logs.md](Training-logs.md)
+> - 📓 **Google Colab notebook:** [Open in Colab](https://colab.research.google.com/github/Fnc-Jit/MissionCtrl/blob/main/google_colab.ipynb)
+> - 🎞️ **Presentation slides:** [tr.ee/V6kf1l](https://tr.ee/V6kf1l)
 
 ![MissionCtrl — system overview](Asset/overview.png)
 
@@ -95,7 +100,7 @@ The judge signal is also designed to resist easy gaming. The mock path rewards d
 
 ![Action timeline — what the overseer actually did](Asset/TImeline.png)
 
-### Act C — The training loop (GRPO on Kaggle’s 2×T4)
+### Act C — The training loop (GRPO on free GPUs)
 
 **GRPO** (Group Relative Policy Optimization, via TRL) is how we turn episodes into **learning signal** without pretending the environment is differentiable.
 
@@ -104,6 +109,14 @@ The judge signal is also designed to resist easy gaming. The mock path rewards d
 The reward function deserves its own sentence in the story: it **reconstructs each episode from a seed embedded in the prompt** (a hackathon tradeoff — production would use a side channel), applies the **model’s first completion** as an action, then rolls the episode forward with a **small greedy script** to termination, and returns the **final** `compute_reward(env)` score — not a meaningless sum of repeated state scores. That design exists because we **burned ourselves** earlier treating “reward” as whatever was easiest to log.
 
 We also parallelized reward work with a **`ThreadPoolExecutor`** (`MISSIONCTRL_REWARD_THREADS`) so cheap CPU env steps did not sit serially behind GPU glamour.
+
+![MissionCtrl — curriculum training reward progression](Asset/RewardM.png)
+
+**Latest curriculum export (mean episode reward):** Phase 1 **(easy) 0.29**, Phase 2 **(medium) 0.07**, Phase 3 **(hard) 0.17** — baseline reference line **0.29**, theoretical ceiling **0.85** on the same chart. Easy sits near baseline; medium dips; hard **recovers vs medium**, which is the kind of shape you want to stare at when someone asks “did GRPO do anything?”
+
+> ### 📓 Ground run — [`Traininglogs.ipynb`](Traininglogs.ipynb) (Google Colab)
+>
+> **Hardware:** 1× **NVIDIA Tesla T4** (~14.6 GB VRAM). **Stack:** **Unsloth `2026.4.8`**, **Transformers `5.5.0`**, base **`Qwen/Qwen2.5-0.5B-Instruct`**, **QLoRA** (~**1.75%** trainable params). **Pre-train baseline:** **mean reward 0.243**. **Curriculum:** **200 + 220 + 180** GRPO steps; **~52 m + 46 m + 43 m** on the three TRL progress bars. **Post-phase greedy eval (10 eps):** **0.289 ± 0.137**, **0.067 ± 0.107**, **0.172 ± 0.024** — **detect 70% / 10% / 0%**, **FP 0%** each phase. **Hub:** **[`Jit-fnc/missionctrl_env`](https://huggingface.co/Jit-fnc/missionctrl_env)** — full stderr/tables in the notebook or **[`Training-logs.md`](Training-logs.md)**.
 
 ---
 
@@ -214,39 +227,44 @@ This is the part of the story we refuse to fudge.
 A **70B-parameter** giant. Pure reasoning, no task-specific training. Decent on easy and special, **collapses on hard** — adversarial hallucinations fool it consistently.
 
 ### After Training
-**Qwen2.5-0.5B** fine-tuned via **GRPO on Kaggle 2×T4** — a model **135× smaller**.
+**Qwen2.5-0.5B** fine-tuned via **GRPO** (Unsloth + QLoRA) — a model **135× smaller** than the 70B baseline, on **free-tier GPUs** (e.g. **Kaggle 2×T4** or **Colab single T4**). **[`Traininglogs.ipynb`](Traininglogs.ipynb)** is the executed Colab logbook; **[`Training-logs.md`](Training-logs.md)** distills the tables and screenshots.
 
 ```
-  Phase 1 (easy  ): 0.260 | detect=60.0% | fp=0.0%
-  Phase 2 (medium): 0.032 | detect=0.0%  | fp=0.0%
-  Phase 3 (hard  ): 0.032 | detect=0.0%  | fp=0.0%
+  Phase 1 (easy  ): 0.29
+  Phase 2 (medium): 0.07
+  Phase 3 (hard  ): 0.17
+  Mean (3 phases): ~0.18
 ```
+
+(Same numbers as **`RewardM.png`** / `train.py` and the post-eval means in **`Traininglogs.ipynb`** when rounded.)
 
 ### Score Showdown
 
-| Metric | Baseline (70B) | Fine-tuned (0.5B) | Delta |
+*Baseline = 70B **inference** tier scores. Fine-tuned = **curriculum phase mean episode reward** (0.5B GRPO) from the plot in Act C — not the same as §7 tier inference bars.*
+
+| Metric | Baseline (70B infer) | Fine-tuned (0.5B GRPO phases) | Delta |
 |---|---|---|---|
-| Easy Score | 0.620 | 0.260 | −0.360 |
-| Medium Score | 0.760 | 0.032 | −0.728 |
-| Hard Score | 0.425 | 0.032 | −0.393 |
-| **Average Score** | **0.648** | **0.108** | **−0.540** |
-| Detection Rate (Easy) | ~75% | 60.0% | −15% |
-| False Positive Rate | ~5% | **0.0%** | ✅ |
+| Easy | 0.620 | **0.29** | −0.33 |
+| Medium | 0.760 | **0.07** | −0.69 |
+| Hard | 0.425 | **0.17** | −0.26 |
+| **Mean (easy+med+hard)** | **0.602** | **~0.18** | **−0.42** |
 | Model Size | 70B params | 0.5B params | **135× smaller** |
-| Training Cost | $0 (API) | $0 (Kaggle free GPU) | — |
+| Training Cost | $0 (API) | $0 (free Colab / Kaggle GPU) | — |
 | Inference Speed | ~7 min / run | Faster per call | ✅ |
+
+*Hallucination KPIs: the exported notebook’s easy-tier post-eval is **70% detect / 0% FP**; older smoke prose (~**60%**) lives in [`Training-logs.md`](Training-logs.md) next to stderr — the curve above is **reward trajectory only**.*
 
 ### What the numbers actually say
 
 The fine-tuned 0.5B has **not** beaten the 70B baseline yet — and that is the **honest story**. But look closer at what it **has** learned.
 
-We see **zero false positives** across all phases: it never incorrectly flags a clean task. A 70B model with no task-specific training still makes on the order of **~5%** false-positive-style errors in this regime; our fine-tuned 0.5B made **none**. It has learned **caution** — it knows when **not** to flag, which is half the battle in AI oversight.
+We still care about **hallucination KPIs** — **`Traininglogs.ipynb`** prints **0% FP** and **70% easy-tier detection** on the 10-episode post-eval — but the **latest story in one image** is still the curve: **0.29 → 0.07 → 0.17** with ceiling **0.85**. Easy tracks the **0.29** baseline band; medium is the bruise; hard is the partial rebound. That is not “solved,” but it is **legible progress** you can put in a deck without hand-waving.
 
-**60% detection on easy** from a model with **135× fewer parameters**, trained for **71 minutes** on **free** GPUs, is a real signal. The GRPO reward gradient is landing — the model is learning the **action space** and the **hallucination detection** objective. The medium and hard collapse is **expected** at this stage: a 0.5B needs more curriculum steps and a corrected eval loop to generalize beyond easy-tier patterns. That is the next iteration.
+A 70B model with no task-specific training still makes on the order of **~5%** false-positive-style errors in this regime; the training job is where we buy **specialist caution**. Paste the next eval grid into [`Training-logs.md`](Training-logs.md) when the numbers move again — the plot and the log should always travel together.
 
 ### The real headline
 
-> **A 0.5B model trained for free in 71 minutes achieves 60% hallucination detection with zero false positives — on a task that stumps much larger models without specialization.**
+> **Latest curriculum mean episode reward: easy 0.29, medium 0.07, hard 0.17 (~34% of the 0.85 composite ceiling on easy) — from a 0.5B GRPO run; [`Traininglogs.ipynb`](Traininglogs.ipynb) records **~2 h 22 m** on the three phase trainer bars (Colab T4), **0.243** pre-train baseline, and **70% / 10% / 0%** detect on post-eval (0% FP each phase). More narrative + screenshots in [`Training-logs.md`](Training-logs.md). The 70B baseline still leads on raw inference tier scores without fine-tuning.**
 
 The baseline 70B is a **generalist guessing**. The fine-tuned 0.5B is a **specialist learning**. Given a **~3B** parameter base and a full curriculum run, the trajectory points well **past the ~0.65** target threshold — not because small always beats large, but because **specialized supervision** can punch above its weight when the simulator tells the truth.
 
@@ -266,9 +284,13 @@ That is the supervision layer enterprises will need as **agent fleets become the
 
 ### Try it
 
-- **🤗 HF Space (environment server):** _coming soon_ — <!-- TODO: HF Space URL -->
-- **📓 Training Notebook (Kaggle 2×T4):** _coming soon_ — <!-- TODO: Kaggle notebook URL -->
-- **🎞️ Presentation Slides:** _coming soon_ — <!-- TODO: slides URL -->
+> ### 🔗 Quick links
+>
+> - **🤗 HF Space (environment server):** [huggingface.co/spaces/Jit-fnc/missionctrl_env](https://huggingface.co/spaces/Jit-fnc/missionctrl_env)
+> - **📓 Colab starter:** [Open `google_colab.ipynb` in Colab](https://colab.research.google.com/github/Fnc-Jit/MissionCtrl/blob/main/google_colab.ipynb)
+> - **📓 Executed training logbook:** [Traininglogs.ipynb](Traininglogs.ipynb) · [view on GitHub](https://github.com/Fnc-Jit/MissionCtrl/blob/main/Traininglogs.ipynb)
+> - **🎞️ Presentation slides:** [tr.ee/V6kf1l](https://tr.ee/V6kf1l)
+
 - **Source:** clone from the GitHub repo (see README — default clone URL documented there).
 - **HF Hub adapter path** (training output): `Proliferation/missionctrl` is wired in `train.py` as `HF_REPO` — replace with your namespace before pushing.
 
@@ -280,8 +302,10 @@ If you open **`VERBOSE_TRACE=1`**, you will see the boxed traces — prompt size
 
 ---
 
-## Epilogue — what we would tell a friend at a bar
+## Epilogue — the one-paragraph debrief
 
-We built MissionCtrl because **nobody was training the supervisor** on purpose. We stayed because the error log kept teaching us: **tight budgets**, **honest eval**, **clear boundaries between env and model**, and **tests that fail loud** beat heroic GPU hours.
+If you only remember one sentence from the whole slog: **benchmarks grade workers; production needs someone grading the grader.** MissionCtrl exists because that second job was mostly vibes and slide decks — we wanted a place where oversight could **fail in the open**, on purpose, with a number at the end.
 
-The fleet is coming. **Someone has to watch the watchers.** This repo is our attempt to make that trainable — chaos first, overseer last, truth somewhere in the reward curve.
+The build did not humble us with “more compute.” It humbled us with **boundaries** — what the environment owns versus what the model owns — and with **evals that do not lie** when you are tired. Cheap GPUs and a short curriculum run are enough to see a **reward curve move**; they are not enough to declare victory. That gap is the honest part, and it is why we keep the log next to the plot.
+
+Strip it to what matters for the road ahead: agents will ship in packs. Mistakes will compound. **The seatbelt is not optional.** This repo is our bet that you can **train** that seatbelt in a simulator — inject the lie, grade the response, ship the trace — until “someone has to watch the watchers” stops sounding like a slogan and starts sounding like a **skill you can rehearse**.
