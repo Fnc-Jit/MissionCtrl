@@ -128,32 +128,26 @@ Artifacts reflected in the UI widgets from the same session include roughly **`a
 
 ![Training complete — MissionCtrl HF Hub upload](Asset/TrainingCp.png)
 
-### GRPO training curves by phase (Unsloth / TRL progress)
+### Curriculum mean episode reward (aggregate)
 
-**Phase 1 — EASY (200 steps)**
+This is the same **mean reward by curriculum phase** figure used in the README and blog (**easy → medium → hard**, baseline **0.29**, ceiling **0.85**).
 
-![Phase 1 — EASY curriculum training](Asset/Phase-1.png)
+![MissionCtrl — curriculum training reward progression](Asset/RewardM.png)
 
-**Phase 2 — MEDIUM (220 steps)**
-
-![Phase 2 — MEDIUM curriculum training](Asset/Phase-2.png)
-
-**Phase 3 — HARD (180 steps)**
-
-![Phase 3 — HARD curriculum training](Asset/Phase-3.png)
+*Step-by-step TRL tables (training loss, `grpo_reward_fn` mean/std, completion lengths) for each phase still live in the saved outputs of **[`Traininglogs.ipynb`](Traininglogs.ipynb)** — e.g. Phase 1 **200** steps (~52 m), Phase 2 **220** (~46 m), Phase 3 **180** (~43 m) on the progress bars.*
 
 ---
 
 ## Reward curve artifact (Colab path)
 
-The notebook also emitted:
+The notebook also emitted `train.py`’s auto plot:
 
 ```text
 📈 Generating reward curve...
   📊 Reward curve saved → /content/drive/MyDrive/missionctrl_checkpoints/reward_curve.png
 ```
 
-For the **checked-in** aggregate plot used in README / blog, see **`Asset/RewardM.png`** (same phase means **0.29 / 0.07 / 0.17** when rounded for prose).
+For documentation and decks, use the checked-in aggregate graph (**§ Curriculum mean episode reward** above) instead of chasing Colab-local `reward_curve.png`.
 
 ---
 
@@ -161,4 +155,4 @@ For the **checked-in** aggregate plot used in README / blog, see **`Asset/Reward
 
 1. Re-run the training cell in **`Traininglogs.ipynb`** (or your Kaggle/Colab copy wired to the same `train.py`).
 2. Replace the **code fences** and tables above with the new stdout if numbers change.
-3. Drop updated screenshots into **`Asset/`** and keep the filenames referenced here (or update the links).
+3. Replace **`Asset/RewardM.png`** when you regenerate the curriculum plot; refresh **`Asset/TrainingCp.png`** if the Hub upload banner changes. Per-phase TRL screenshots are optional — the notebook remains the source of truth for those tables.
