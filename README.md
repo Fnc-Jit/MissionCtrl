@@ -1,26 +1,12 @@
 ---
-title: Mission Control
-emoji: "🛡️"
-colorFrom: blue
-colorTo: indigo
-sdk: docker
-tags:
-  - openenv
-  - oversight
-  - hallucination
-  - multi-agent
-  - fastapi
-  - dashboard
----
-
 # 🛡️ MissionCtrl — AI Oversight Fleet Environment
 
 > *Every LLM agent fleet will hallucinate. **MissionCtrl trains the overseer to catch them.***
 
-[![OpenEnv Compatible](https://img.shields.io/badge/OpenEnv-Compatible-6366f1?style=flat-square)](https://huggingface.co/openenv)
-[![Python 3.11](https://img.shields.io/badge/Python-3.11-3b82f6?style=flat-square)](https://www.python.org/)
-[![Docker Ready](https://img.shields.io/badge/Docker-Ready-10b981?style=flat-square)](https://www.docker.com/)
-[![Tests](https://img.shields.io/badge/Tests-112%20collected-34d399?style=flat-square)]()
+[![OpenEnv Compatible](https://img.shields.io/badge/OpenEnv-Compatible-6366f1?style=for-the-badge)](https://huggingface.co/openenv)
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
+[![Tests](https://img.shields.io/badge/Tests-112%20collected-34d399?style=for-the-badge)]()
 
 > ### 🔗 Links
 >
