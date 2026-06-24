@@ -1,4 +1,3 @@
----
 # 🛡️ MissionCtrl — AI Oversight Fleet Environment
 
 > *Every LLM agent fleet will hallucinate. **MissionCtrl trains the overseer to catch them.***
